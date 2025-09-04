@@ -17,6 +17,11 @@ executors:
     docker:
       - image: cimg/base:stable
     working_directory: ~/project
+    
+  terraform-docker-executor:
+    docker:
+      - image: hashicorp/terraform:1.13.1
+    working_directory: ~/project
 
   terraform-executor:
     docker:
@@ -398,12 +403,12 @@ jobs:
       - push-to-ecr-with-auth
 
   terraform-plan:
-    executor: terraform-executor
+    executor: terraform-docker-executor
     steps:
       - terraform-plan-with-auth
 
   terraform-apply:
-    executor: terraform-executor
+    executor: terraform-docker-executor
     steps:
       - terraform-apply-with-auth
 
