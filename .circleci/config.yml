@@ -18,7 +18,7 @@ executors:
     
   docker-executor:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:2025.09
     working_directory: ~/project
     
   terraform-executor:
