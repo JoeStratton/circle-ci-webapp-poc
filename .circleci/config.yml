@@ -176,14 +176,6 @@ commands:
             cd terraform
             terraform init
             terraform apply tfplan
-      - run:
-          name: Update deploy status
-          command: |
-            if [ $? -eq 0 ]; then
-              circleci run release update terraform-deploy --status=success || true
-            else
-              circleci run release update terraform-deploy --status=fail || true
-            fi
 
   push-to-ecr-with-auth:
     description: "Push Docker image to ECR with OIDC authentication"
@@ -263,6 +255,14 @@ commands:
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
             aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
             aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+      - run:
+          name: Update deploy status
+          command: |
+            if [ $? -eq 0 ]; then
+              circleci run release update terraform-deploy --status=success || true
+            else
+              circleci run release update terraform-deploy --status=fail || true
+            fi
 
 # Job definitions
 jobs:
