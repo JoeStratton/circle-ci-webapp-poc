@@ -241,7 +241,7 @@ jobs:
           name: Create deployment artifact
           command: |
             mkdir -p artifacts
-            cat > artifacts/deployment-info.json << EOF
+            cat > artifacts/deployment-info.json \<< EOF
             {
               "commit_sha": "${CIRCLE_SHA1}",
               "branch": "${CIRCLE_BRANCH}",
