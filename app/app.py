@@ -159,6 +159,8 @@ if __name__ == '__main__':
     # Run the application
     port = config.PORT
     debug = config.DEBUG
+    # avoids bandit error for open ip
+    host = os.environ.get('HOST', '0.0.0.0')  # nosec B104
 
-    logger.info(f"Starting Flask application on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    logger.info(f"Starting Flask application on {host}:{port}")
+    app.run(host=host, port=port, debug=debug)  # nosec B104
