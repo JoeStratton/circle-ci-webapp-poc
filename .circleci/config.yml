@@ -18,6 +18,11 @@ executors:
       - image: cimg/base:stable
     working_directory: ~/project
 
+  terraform-executor:
+    docker:
+      - image: hashicorp/terraform:1.13.1
+    working_directory: ~/project
+
 # Commands for reusable logic
 commands:
   setup-dependencies:
@@ -360,12 +365,12 @@ jobs:
 
   # Terraform validation jobs
   terraform-fmt:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - terraform-format-check
 
   terraform-validate:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - terraform-validate-config
 
@@ -376,12 +381,12 @@ jobs:
       - push-to-ecr-with-auth
 
   terraform-plan:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - terraform-plan-with-auth
 
   terraform-apply:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - terraform-apply-with-auth
 
