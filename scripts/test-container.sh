@@ -130,6 +130,7 @@ fi
 # JUnit XML: Generates test reports for CircleCI integration
 print_status "Running additional container validation with pytest..."
 cd app
+export FLASK_ENV=testing
 python -m pytest tests/test_container.py -v \
     --junit-xml=../test-results/container-validation.xml \
     --tb=short \

@@ -383,24 +383,18 @@ workflows:
       
       # Unit tests - runs on all branches  
       - unit-tests:
-          requires:
-            - lint-and-format
           filters:
             tags:
               only: /.*/
       
       # Integration tests with PostgreSQL sidecar - runs on all branches
       - integration-tests:
-          requires:
-            - unit-tests
           filters:
             tags:
               only: /.*/
       
       # Build and test Docker image - runs on ALL branches (dev + main)
       - build-and-test-image:
-          requires:
-            - integration-tests
           filters:
             tags:
               only: /.*/
@@ -408,6 +402,9 @@ workflows:
       # Container tests with dgoss - runs on ALL branches (dev + main)
       - container-tests:
           requires:
+            - lint-and-format
+            - unit-tests
+            - integration-tests
             - build-and-test-image
           filters:
             tags:

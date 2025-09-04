@@ -32,7 +32,8 @@ def get_config():
         'SECRET_KEY': os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production'),
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
         'PORT': int(os.environ.get('PORT', 5000)),
-        'DEBUG': env == 'development'
+        'DEBUG': env == 'development',
+        'FLASK_ENV': env
     }
     
     # Set database URL based on environment
