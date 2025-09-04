@@ -436,8 +436,6 @@ jobs:
 # Workflows define job orchestration with branch-based conditions
 workflows:
   version: 2
-  
-  # Single workflow that handles both development and production
   build-test-deploy:
     jobs:
       # Code quality - runs on all branches
@@ -453,13 +451,14 @@ workflows:
       - build-and-test-image
       
       # Container tests with dgoss - runs on all branches
+
       - container-tests:
           requires:
             - lint-and-format
             - unit-tests
             - integration-tests
             - build-and-test-image
-      
+     
       # Push to ECR - MAIN BRANCH ONLY
       - push-to-ecr:
           requires:
