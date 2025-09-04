@@ -224,7 +224,6 @@ jobs:
               echo "ERROR: AWS_ROLE_ARN is not set"
               exit 1
             fi
-            
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
             # Export the OIDC token for AWS CLI
@@ -304,7 +303,6 @@ jobs:
               echo "ERROR: AWS_ROLE_ARN is not set"
               exit 1
             fi
-            
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
             # Export the OIDC token for AWS CLI
@@ -370,7 +368,6 @@ jobs:
               echo "ERROR: AWS_ROLE_ARN is not set"
               exit 1
             fi
-            
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
             # Export the OIDC token for AWS CLI
