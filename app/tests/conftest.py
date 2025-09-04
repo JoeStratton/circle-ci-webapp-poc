@@ -21,7 +21,8 @@ Framework Benefits:
 import os
 import pytest
 import tempfile
-from app import app, db, User, HealthCheck
+from app import app, db
+from models import User, HealthCheck
 
 
 @pytest.fixture
@@ -63,7 +64,12 @@ def sample_user(client):
         user = User(**user_data)
         db.session.add(user)
         db.session.commit()
-        return user
+        # Return user data instead of the object to avoid detached instance issues
+        return {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email
+        }
 
 
 @pytest.fixture
@@ -80,6 +86,10 @@ def multiple_users(client):
         for user_data in users_data:
             user = User(**user_data)
             db.session.add(user)
-            users.append(user)
+            users.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email
+            })
         db.session.commit()
         return users

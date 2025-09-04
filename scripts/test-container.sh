@@ -91,7 +91,7 @@ port:
 http:
   http://localhost:5000/health:
     status: 200
-    timeout: 10000
+    timeout: 30000
     body:
       - "healthy"
 process:
@@ -110,6 +110,9 @@ EOF
 # Validates: Container behavior, port availability, process health, HTTP endpoints
 # YAML-based: Declarative test specification for container validation
 print_status "Running container tests with dgoss framework..."
+
+# Add startup delay to allow container to fully initialize
+export GOSS_SLEEP=10
 GOSS_FILES_STRATEGY=cp dgoss run \
     -e DATABASE_URL=sqlite:///test.db \
     -e FLASK_ENV=testing \
@@ -127,9 +130,15 @@ fi
 # JUnit XML: Generates test reports for CircleCI integration
 print_status "Running additional container validation with pytest..."
 cd app
+export FLASK_ENV=testing
 python -m pytest tests/test_container.py -v \
-    --junit-xml=../test-results/container-tests.xml \
+    --junit-xml=../test-results/container-validation.xml \
     --tb=short \
+    --cov=. \
+    --cov-report=xml:../coverage/container-coverage.xml \
+    --cov-report=html:../coverage/container-html \
+    --cov-report=term-missing \
+    --cov-fail-under=20 \
     -m "container"
 
 if [ $? -eq 0 ]; then

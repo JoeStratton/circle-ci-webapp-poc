@@ -2,9 +2,9 @@ version: 2.1
 
 # Orbs for enhanced functionality
 orbs:
-  aws-cli: circleci/aws-cli@4.0
-  docker: circleci/docker@2.2
-  python: circleci/python@2.1
+  aws-cli: circleci/aws-cli@5.4.1
+  docker: circleci/docker@3.0.0
+  python: circleci/python@3.2.0
 
 # Executors define the execution environment
 executors:
@@ -58,12 +58,6 @@ commands:
             ./scripts/test-integration.sh
       - store_test_results:
           path: test-results
-      - store_artifacts:
-          path: test-results
-          destination: test-results
-      - store_artifacts:
-          path: coverage
-          destination: coverage
 
   security-scan:
     description: "Run security scans and compliance checks"
@@ -71,8 +65,13 @@ commands:
       - run:
           name: Security scan with bandit
           command: |
+            mkdir -p test-results
             bandit -r app/app.py -f json -o security-report.json || true
             bandit -r app/app.py -f txt
+            # Generate JUnit XML for test results
+            bandit -r app/app.py -f json -o test-results/security-tests.xml || true
+      - store_test_results:
+          path: test-results
       - store_artifacts:
           path: security-report.json
           destination: security-report.json
@@ -108,12 +107,6 @@ jobs:
             ./scripts/test-unit.sh
       - store_test_results:
           path: test-results
-      - store_artifacts:
-          path: test-results
-          destination: unit-test-results
-      - store_artifacts:
-          path: coverage
-          destination: unit-coverage
 
   # Integration tests with PostgreSQL sidecar 
   integration-tests:
@@ -138,8 +131,7 @@ jobs:
     executor: docker-executor
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - run:
           name: Build custom Docker image
           command: |
@@ -183,13 +175,12 @@ jobs:
 
   # Container testing with dgoss (requirement #3)
   container-tests:
-    executor: docker-executor
+    executor: python-executor
     steps:
-      - checkout
+      - setup-dependencies
       - attach_workspace:
           at: .
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - run:
           name: Load Docker image from workspace
           command: |
@@ -198,9 +189,8 @@ jobs:
           name: Run container tests with dedicated script
           command: |
             ./scripts/test-container.sh
-      - store_artifacts:
+      - store_test_results:
           path: test-results
-          destination: container-test-results
 
   # Push Docker image to ECR (main branch only)
   push-to-ecr:
@@ -209,11 +199,18 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - aws-cli/setup:
-          role-arn: $AWS_ROLE_ARN  # OIDC role for secure authentication
           region: $AWS_REGION
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            # Configure AWS CLI to use OIDC token
+            aws configure set region $AWS_REGION
+            # Export the OIDC token for AWS CLI
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
       - run:
           name: Load and tag Docker image
           command: |
@@ -241,7 +238,7 @@ jobs:
           name: Create deployment artifact
           command: |
             mkdir -p artifacts
-            cat > artifacts/deployment-info.json << EOF
+            cat > artifacts/deployment-info.json \<< EOF
             {
               "commit_sha": "${CIRCLE_SHA1}",
               "branch": "${CIRCLE_BRANCH}",
@@ -255,14 +252,25 @@ jobs:
           path: artifacts
           destination: deployment-artifacts
 
-  # Deploy complete infrastructure with Terraform (simplified single-layer)
-  deploy-with-terraform:
+  # Terraform plan job
+  terraform-plan:
     executor: terraform-executor
     steps:
       - checkout
       - aws-cli/setup:
-          role-arn: $AWS_ROLE_ARN  # OIDC role for secure authentication
           region: $AWS_REGION
+      - run:
+          name: Plan a deploy
+          command: circleci run release plan --target-version=${CIRCLE_SHA1}
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            # Configure AWS CLI to use OIDC token
+            aws configure set region $AWS_REGION
+            # Export the OIDC token for AWS CLI
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
       - run:
           name: Terraform format and validate
           command: |
@@ -279,11 +287,41 @@ jobs:
               -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
               -var="database_username=$DB_USERNAME" \
               -var="database_password=$DB_PASSWORD" \
-              -out=tfplan
+              -out=tfplan \
+              -detailed-exitcode
+      - run:
+          name: Generate human-readable plan output
+          command: |
+            cd terraform
+            terraform show -no-color tfplan > plan-output.txt
+      - store_artifacts:
+          path: terraform/tfplan
+          destination: terraform-plan
+      - store_artifacts:
+          path: terraform/plan-output.txt
+          destination: terraform-plan-output
+
+  # Deploy complete infrastructure with Terraform (simplified single-layer)
+  deploy-with-terraform:
+    executor: terraform-executor
+    steps:
+      - checkout
+      - aws-cli/setup:
+          region: $AWS_REGION
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            # Configure AWS CLI to use OIDC token
+            aws configure set region $AWS_REGION
+            # Export the OIDC token for AWS CLI
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
       - run:
           name: Terraform apply (cost-optimized infrastructure)
           command: |
             cd terraform
+            terraform init
             terraform apply -auto-approve tfplan
             
             # Get outputs for ECS deployment
@@ -321,11 +359,14 @@ jobs:
             aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
             
             echo "✅ ECS service updated successfully"
-      - store_artifacts:
-          path: terraform/tfplan
-          destination: terraform-plan
-
-
+      - run:
+          name: Update a deploy to SUCCESS
+          command: circleci run release update --status=SUCCESS
+          when: on_success
+      - run:
+          name: Update planned deploy to FAILED
+          command: circleci run release update --status=FAILED
+          when: on_fail
 
 # Workflows define job orchestration with branch-based conditions
 workflows:
@@ -342,24 +383,18 @@ workflows:
       
       # Unit tests - runs on all branches  
       - unit-tests:
-          requires:
-            - lint-and-format
           filters:
             tags:
               only: /.*/
       
       # Integration tests with PostgreSQL sidecar - runs on all branches
       - integration-tests:
-          requires:
-            - unit-tests
           filters:
             tags:
               only: /.*/
       
       # Build and test Docker image - runs on ALL branches (dev + main)
       - build-and-test-image:
-          requires:
-            - integration-tests
           filters:
             tags:
               only: /.*/
@@ -367,6 +402,9 @@ workflows:
       # Container tests with dgoss - runs on ALL branches (dev + main)
       - container-tests:
           requires:
+            - lint-and-format
+            - unit-tests
+            - integration-tests
             - build-and-test-image
           filters:
             tags:
@@ -382,10 +420,29 @@ workflows:
           context:
             - aws-production
       
+      # Terraform plan - MAIN BRANCH ONLY
+      - terraform-plan:
+          requires:
+            - push-to-ecr
+          filters:
+            branches:
+              only: main
+          context:
+            - aws-production
+      
+      # Terraform approval - MAIN BRANCH ONLY
+      - hold:
+          type: approval
+          requires:
+            - terraform-plan
+          filters:
+            branches:
+              only: main
+      
       # Deploy with Terraform - MAIN BRANCH ONLY
       - deploy-with-terraform:
           requires:
-            - push-to-ecr
+            - hold
           filters:
             branches:
               only: main

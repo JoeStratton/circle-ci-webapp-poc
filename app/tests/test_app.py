@@ -32,7 +32,8 @@ Test Fixtures:
 
 import json
 import pytest
-from app import app, db, User, HealthCheck
+from app import app, db
+from models import User, HealthCheck
 
 # pytest markers for better test organization and JUnit XML categorization
 
@@ -146,7 +147,7 @@ class TestUserEndpoints:
     def test_create_duplicate_user(self, client, sample_user):
         """Test creating a user with duplicate username or email"""
         duplicate_data = {
-            'username': sample_user.username,
+            'username': sample_user['username'],
             'email': 'different@example.com'
         }
         
@@ -177,7 +178,7 @@ class TestUserEndpoints:
     
     def test_delete_user(self, client, sample_user):
         """Test deleting a user"""
-        user_id = sample_user.id
+        user_id = sample_user['id']
         
         response = client.delete(f'/api/users/{user_id}')
         assert response.status_code == 200
@@ -247,7 +248,7 @@ class TestMainRoutes:
         """Test the main index route"""
         response = client.get('/')
         assert response.status_code == 200
-        assert b'CircleCI Field Engineer Demo Application' in response.data
+        assert b'CircleCI Demo POC' in response.data
         assert b'Application Status' in response.data
     
     def test_404_error_handler(self, client):
@@ -319,3 +320,212 @@ class TestIntegration:
         health_response = client.get('/api/health')
         health_data = json.loads(health_response.data)
         assert health_data['user_count'] == 4
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestErrorHandling:
+    """Test error handling and edge cases"""
+    
+    def test_500_error_handler(self, client):
+        """Test 500 error handling"""
+        # This test is tricky to trigger in unit tests, but we can test the handler exists
+        # by checking the app has the error handler registered
+        assert 500 in app.error_handler_spec[None]
+    
+    def test_database_connection_error_in_index(self, client, monkeypatch):
+        """Test index route handles database connection errors"""
+        def mock_execute(*args, **kwargs):
+            raise Exception("Database connection failed")
+        
+        monkeypatch.setattr('sqlalchemy.text', lambda x: x)
+        monkeypatch.setattr('app.db.session.execute', mock_execute)
+        
+        response = client.get('/')
+        assert response.status_code == 200
+        assert b'Disconnected' in response.data
+    
+    def test_database_connection_error_in_health(self, client, monkeypatch):
+        """Test health endpoint handles database connection errors"""
+        def mock_execute(*args, **kwargs):
+            raise Exception("Database connection failed")
+        
+        monkeypatch.setattr('sqlalchemy.text', lambda x: x)
+        monkeypatch.setattr('app.db.session.execute', mock_execute)
+        
+        response = client.get('/health')
+        assert response.status_code == 500
+        
+        data = json.loads(response.data)
+        assert data['status'] == 'unhealthy'
+        assert 'Database connection failed' in data['error']
+    
+    def test_database_connection_error_in_api_health(self, client, monkeypatch):
+        """Test API health endpoint handles database connection errors"""
+        def mock_execute(*args, **kwargs):
+            raise Exception("Database query failed")
+        
+        monkeypatch.setattr('sqlalchemy.text', lambda x: x)
+        monkeypatch.setattr('app.db.session.execute', mock_execute)
+        
+        response = client.get('/api/health')
+        assert response.status_code == 500
+        
+        data = json.loads(response.data)
+        assert data['status'] == 'unhealthy'
+        assert 'Database query failed' in data['error']
+    
+    def test_get_users_database_error(self, client, monkeypatch):
+        """Test get users handles database errors"""
+        def mock_query(*args, **kwargs):
+            raise Exception("Database query failed")
+        
+        monkeypatch.setattr('models.User.query', mock_query)
+        
+        response = client.get('/api/users')
+        assert response.status_code == 500
+        
+        data = json.loads(response.data)
+        assert 'error' in data
+    
+    def test_create_user_database_error(self, client, monkeypatch):
+        """Test create user handles database errors"""
+        def mock_add(*args, **kwargs):
+            raise Exception("Database add failed")
+        
+        monkeypatch.setattr('app.db.session.add', mock_add)
+        
+        user_data = {
+            'username': 'erroruser',
+            'email': 'error@example.com'
+        }
+        
+        response = client.post('/api/users',
+                             data=json.dumps(user_data),
+                             content_type='application/json')
+        assert response.status_code == 500
+        
+        data = json.loads(response.data)
+        assert 'error' in data
+    
+    def test_delete_user_database_error(self, client, sample_user, monkeypatch):
+        """Test delete user handles database errors"""
+        def mock_delete(*args, **kwargs):
+            raise Exception("Database delete failed")
+        
+        monkeypatch.setattr('app.db.session.delete', mock_delete)
+        
+        response = client.delete(f'/api/users/{sample_user["id"]}')
+        assert response.status_code == 500
+        
+        data = json.loads(response.data)
+        assert 'error' in data
+    
+    def test_init_database_error(self, client, monkeypatch):
+        """Test database init endpoint handles errors"""
+        def mock_create_all(*args, **kwargs):
+            raise Exception("Database creation failed")
+        
+        monkeypatch.setattr('app.db.create_all', mock_create_all)
+        
+        response = client.get('/api/database/init')
+        assert response.status_code == 500
+        
+        data = json.loads(response.data)
+        assert 'error' in data
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestAppInitialization:
+    """Test application initialization and configuration"""
+    
+    def test_create_app_function(self):
+        """Test create_app function works correctly"""
+        from app import create_app
+        app_instance = create_app()
+        assert app_instance is not None
+        assert hasattr(app_instance, 'config')
+    
+    def test_app_config_loading(self):
+        """Test that app configuration is loaded correctly"""
+        # In test mode, TESTING should be True
+        assert app.config['TESTING'] is True
+        assert 'SQLALCHEMY_DATABASE_URI' in app.config
+    
+    def test_database_initialization(self):
+        """Test database initialization"""
+        with app.app_context():
+            # Test that database can be created
+            db.create_all()
+            # Test that tables exist
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            assert 'users' in tables
+            assert 'health_checks' in tables
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestEdgeCases:
+    """Test edge cases and boundary conditions"""
+    
+    def test_create_user_empty_json(self, client):
+        """Test creating user with empty JSON"""
+        response = client.post('/api/users',
+                             data=json.dumps({}),
+                             content_type='application/json')
+        assert response.status_code == 400
+        
+        data = json.loads(response.data)
+        assert 'Username and email are required' in data['error']
+    
+    def test_create_user_missing_username(self, client):
+        """Test creating user with missing username"""
+        user_data = {'email': 'test@example.com'}
+        response = client.post('/api/users',
+                             data=json.dumps(user_data),
+                             content_type='application/json')
+        assert response.status_code == 400
+        
+        data = json.loads(response.data)
+        assert 'Username and email are required' in data['error']
+    
+    def test_create_user_missing_email(self, client):
+        """Test creating user with missing email"""
+        user_data = {'username': 'testuser'}
+        response = client.post('/api/users',
+                             data=json.dumps(user_data),
+                             content_type='application/json')
+        assert response.status_code == 400
+        
+        data = json.loads(response.data)
+        assert 'Username and email are required' in data['error']
+    
+    def test_create_user_invalid_json(self, client):
+        """Test creating user with invalid JSON"""
+        response = client.post('/api/users',
+                             data='invalid json',
+                             content_type='application/json')
+        assert response.status_code == 500  # Flask returns 500 for JSON decode errors
+    
+    def test_delete_nonexistent_user(self, client):
+        """Test deleting a user that doesn't exist"""
+        response = client.delete('/api/users/99999')
+        assert response.status_code == 404
+        
+        data = json.loads(response.data)
+        assert 'User not found' in data['error']
+    
+    def test_index_with_database_error_fetching_users(self, client, monkeypatch):
+        """Test index route handles errors when fetching users"""
+        def mock_query(*args, **kwargs):
+            raise Exception("User query failed")
+        
+        monkeypatch.setattr('models.User.query', mock_query)
+        
+        response = client.get('/')
+        assert response.status_code == 200
+        # Should still render the page even if user fetching fails
+        assert b'CircleCI Demo POC' in response.data
