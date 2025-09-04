@@ -166,57 +166,23 @@ commands:
       - configure-oidc-auth
       - run:
           name: Start release plan
-          command: |
-            # Try to list environments first, then use the first available one
-            echo "🔍 Checking available environments:"
-            circleci run release list-environments || echo "Cannot list environments"
-            
-            # Try common environment names and capture which one works
-            echo "🚀 Attempting to start release plan..."
-            
-            if circleci run release plan terraform-deploy --environment-name=dev --component-name=infrastructure --target-version=${CIRCLE_SHA1}; then
-              echo "✅ Successfully started release plan with environment: dev"
-            elif circleci run release plan terraform-deploy --environment-name=development --component-name=infrastructure --target-version=${CIRCLE_SHA1}; then
-              echo "✅ Successfully started release plan with environment: development"
-            elif circleci run release plan terraform-deploy --environment-name=staging --component-name=infrastructure --target-version=${CIRCLE_SHA1}; then
-              echo "✅ Successfully started release plan with environment: staging"
-            elif circleci run release plan terraform-deploy --environment-name=production --component-name=infrastructure --target-version=${CIRCLE_SHA1}; then
-              echo "✅ Successfully started release plan with environment: production"
-            else
-              echo "❌ No suitable environment found, skipping release plan"
-            fi
+          command: circleci run release plan terraform-deploy --environment-name=dev --component-name=infrastructure --target-version=${CIRCLE_SHA1}
       - run:
           name: Terraform apply
           command: |
-            # Configure AWS CLI with OIDC token
             export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
             
             cd terraform
             terraform init
-            # Apply the plan that was generated in the terraform-plan job
             terraform apply tfplan
       - run:
           name: Update deploy status
           command: |
             if [ $? -eq 0 ]; then
-              echo "✅ Deployment completed successfully"
-              # Try to update release status with the same environment that worked
-              echo "🔄 Updating release status..."
-              circleci run release update terraform-deploy --status=success --environment-name=dev --component-name=infrastructure || \
-              circleci run release update terraform-deploy --status=success --environment-name=development --component-name=infrastructure || \
-              circleci run release update terraform-deploy --status=success --environment-name=staging --component-name=infrastructure || \
-              circleci run release update terraform-deploy --status=success --environment-name=production --component-name=infrastructure || \
-              echo "Release update not available"
+              circleci run release update terraform-deploy --status=success || true
             else
-              echo "❌ Deployment failed"
-              # Try to update release status with the same environment that worked
-              echo "🔄 Updating release status..."
-              circleci run release update terraform-deploy --status=fail --environment-name=dev --component-name=infrastructure || \
-              circleci run release update terraform-deploy --status=fail --environment-name=development --component-name=infrastructure || \
-              circleci run release update terraform-deploy --status=fail --environment-name=staging --component-name=infrastructure || \
-              circleci run release update terraform-deploy --status=fail --environment-name=production --component-name=infrastructure || \
-              echo "Release update not available"
+              circleci run release update terraform-deploy --status=fail || true
             fi
 
   push-to-ecr-with-auth:
@@ -284,32 +250,19 @@ commands:
       - run:
           name: Update ECS service with new image
           command: |
-            # Configure AWS CLI with OIDC token
             export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
             
-            # Get ECR repository URL
             ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
             ECS_CLUSTER="circle-ci-webapp-poc-cluster"
-            ECS_SERVICE="circle-ci-webapp-poc-app-service"
-            TASK_FAMILY="circle-ci-webapp-poc-app-service"
+            ECS_SERVICE="circle-ci-webapp-poc-service"
+            TASK_FAMILY="circle-ci-webapp-poc-task"
             
-            # Get current task definition
             TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY --query taskDefinition)
-            
-            # Update image URI in task definition
             NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$ECR_URI:$CIRCLE_SHA1" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            # Register new task definition
             NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
-            
-            # Update ECS service
             aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
-            
-            # Wait for deployment to complete
             aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
-            
-            echo "✅ ECS service updated successfully"
 
 # Job definitions
 jobs:
