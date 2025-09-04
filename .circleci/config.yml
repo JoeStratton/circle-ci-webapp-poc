@@ -166,7 +166,7 @@ commands:
       - configure-oidc-auth
       - run:
           name: Start release plan
-          command: circleci run release plan terraform-deploy --environment-name=production --component-name=infrastructure --target-version=${CIRCLE_SHA1}
+          command: circleci run release plan terraform-deploy --target-version=${CIRCLE_SHA1}
       - run:
           name: Terraform apply
           command: |
@@ -182,9 +182,9 @@ commands:
           name: Update deploy status
           command: |
             if [ $? -eq 0 ]; then
-              circleci run release update terraform-deploy --status=success --environment-name=production --component-name=infrastructure
+              circleci run release update terraform-deploy --status=success
             else
-              circleci run release update terraform-deploy --status=fail --environment-name=production --component-name=infrastructure
+              circleci run release update terraform-deploy --status=fail
             fi
 
   push-to-ecr-with-auth:
