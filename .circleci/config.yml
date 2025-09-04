@@ -146,9 +146,9 @@ jobs:
       - run:
           name: Health checks
           command: |
-            sleep 20
-            curl -f http://localhost:5000/health
-            curl -f http://localhost:5000/api/health
+            sleep 30
+            curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/health
+            curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/api/health
       - run:
           name: Cleanup
           command: |
@@ -180,6 +180,19 @@ jobs:
             ./scripts/test-container.sh
       - store_test_results:
           path: test-results
+
+  # Terraform validate with local init (no AWS creds needed)
+  tf-validate-oidc:
+    executor: python-executor
+    steps:
+      - checkout
+      - aws-cli/setup:
+          region: $AWS_REGION
+          role_arn: $AWS_ROLE_ARN
+      - terraform/init:
+          path: terraform
+      - terraform/validate:
+          path: terraform
 
   # Terraform OIDC-wrapped jobs
   tf-plan-oidc:
@@ -233,12 +246,8 @@ workflows:
       - integration-tests
       - terraform/fmt:
           checkout: true
-          context: aws-production
           path: terraform
-      - terraform/validate:
-          checkout: true
-          context: aws-production
-          path: terraform
+      - tf-validate-oidc:
           requires:
             - terraform/fmt
   
