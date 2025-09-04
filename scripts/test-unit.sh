@@ -43,7 +43,7 @@ cd app
 # Features: Fixtures, markers, coverage integration, CircleCI native reporting
 print_status "Running unit tests with pytest framework and SQLite in-memory database..."
 python -m pytest tests/ -v \
-    --junit-xml=../test-results/junit.xml \
+    --junit-xml=../test-results/unit-tests.xml \
     --cov=app \
     --cov-report=xml:../coverage/unit-coverage.xml \
     --cov-report=html:../coverage/unit-html \

@@ -65,8 +65,13 @@ commands:
       - run:
           name: Security scan with bandit
           command: |
+            mkdir -p test-results
             bandit -r app/app.py -f json -o security-report.json || true
             bandit -r app/app.py -f txt
+            # Generate JUnit XML for test results
+            bandit -r app/app.py -f json -o test-results/security-tests.xml || true
+      - store_test_results:
+          path: test-results
       - store_artifacts:
           path: security-report.json
           destination: security-report.json
