@@ -131,7 +131,7 @@ fi
 print_status "Running additional container validation with pytest..."
 cd app
 python -m pytest tests/test_container.py -v \
-    --junit-xml=../test-results/junit.xml \
+    --junit-xml=../test-results/container-validation.xml \
     --tb=short \
     -m "container"
 

@@ -175,7 +175,7 @@ jobs:
 
   # Container testing with dgoss (requirement #3)
   container-tests:
-    executor: docker-executor
+    executor: python-executor
     steps:
       - checkout
       - attach_workspace:

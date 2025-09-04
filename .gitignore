@@ -29,6 +29,7 @@ goss
 goss.yaml
 coverage/
 coverage.xml
+notes.txt
 
 # Database files
 *.db
