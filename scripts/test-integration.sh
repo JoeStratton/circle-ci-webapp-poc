@@ -65,7 +65,8 @@ python -m pytest tests/ -v \
     --cov-report=html:../coverage/integration-html \
     --cov-report=term-missing \
     --tb=short \
-    -m "integration or database"
+    -m "integration or database" \
+    --cov-fail-under=55
 
 if [ $? -eq 0 ]; then
     print_success "Integration tests passed!"
