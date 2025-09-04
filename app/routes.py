@@ -226,7 +226,7 @@ def delete_user(user_id):
     This endpoint deletes a user by their ID.
     """
     try:
-        user = db.session.get(User, user_id)
+        user = current_app.db.session.get(User, user_id)
         if not user:
             raise NotFound()
         current_app.db.session.delete(user)

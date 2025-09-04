@@ -5,7 +5,7 @@ __pycache__/
 .coverage
 .pytest_cache/
 test-results/
-coverage/
+htmlcov/
 *.log
 .env
 .venv
@@ -27,6 +27,12 @@ SETUP.md
 dgoss
 goss
 goss.yaml
+coverage/
+coverage.xml
+
+# Database files
+*.db
+instance/
 
 # Certificates
 *.crt
