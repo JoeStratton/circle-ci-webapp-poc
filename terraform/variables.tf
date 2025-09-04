@@ -115,6 +115,6 @@ variable "common_tags" {
     Project     = "circleci-demo"
     Environment = "dev"
     ManagedBy   = "terraform"
-    Purpose     = "field-engineer-assessment"
+    Owner       = "joe"
   }
 }
