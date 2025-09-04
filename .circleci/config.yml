@@ -182,9 +182,17 @@ jobs:
             echo "Waiting for Flask app to start..."
             sleep 15
             
+            # Check container logs again after wait
+            echo "Container logs after wait:"
+            docker logs test-app --tail 20
+            
             # Check if port is accessible
             echo "Testing port connectivity:"
             nc -z localhost 5000 && echo "Port 5000 is open" || echo "Port 5000 is not accessible"
+            
+            # Try connecting from inside the container
+            echo "Testing from inside container:"
+            docker exec test-app curl -s http://localhost:5000/health || echo "Cannot connect from inside container"
             
             # Check database initialization via Flask app
             echo "Checking database initialization..."
@@ -194,7 +202,7 @@ jobs:
                 break
               fi
               echo "Attempt $i: Database not ready yet, waiting..."
-              sleep 2
+              sleep 3
             done
             
             # Final verification - both health endpoints
