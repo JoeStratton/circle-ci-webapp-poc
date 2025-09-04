@@ -162,8 +162,6 @@ jobs:
             dockerize -wait tcp://localhost:5432 -timeout 1m
           environment:
             DOCKERIZE_VERSION: v0.9.6
-          requires:
-            - image: cimg/postgres:13.8
       - run:
           name: Start app container and run health checks
           command: |
@@ -174,10 +172,35 @@ jobs:
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
             
-            # Run health checks with proper retry
-            echo "Running health checks:"
-            curl --fail --retry 10 --retry-connrefused --retry-delay 5 http://localhost:5000/health
-            curl --fail --retry 10 --retry-connrefused --retry-delay 5 http://localhost:5000/api/health
+            # Debug: Check container status
+            echo "Container status:"
+            docker ps -a
+            echo "Container logs:"
+            docker logs test-app
+            
+            # Wait for Flask app to start
+            echo "Waiting for Flask app to start..."
+            sleep 15
+            
+            # Check if port is accessible
+            echo "Testing port connectivity:"
+            nc -z localhost 5000 && echo "Port 5000 is open" || echo "Port 5000 is not accessible"
+            
+            # Check database initialization via Flask app
+            echo "Checking database initialization..."
+            for i in {1..30}; do
+              if curl -s http://localhost:5000/api/health | grep -q "healthy"; then
+                echo "Database is initialized and app is healthy!"
+                break
+              fi
+              echo "Attempt $i: Database not ready yet, waiting..."
+              sleep 2
+            done
+            
+            # Final verification - both health endpoints
+            echo "Running final health checks:"
+            curl --fail http://localhost:5000/health
+            curl --fail http://localhost:5000/api/health
       - run:
           name: Cleanup
           command: |
