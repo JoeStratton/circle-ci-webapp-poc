@@ -186,6 +186,17 @@ jobs:
             docker ps -a
             echo "Container logs before health check:"
             docker logs test-app --tail 20
+            
+            # Test connectivity first
+            echo "Testing port connectivity:"
+            nc -z localhost 5000 && echo "Port 5000 is open" || echo "Port 5000 is not accessible"
+            
+            # Test with a simple curl first
+            echo "Testing simple curl:"
+            curl -v http://localhost:5000/health || echo "Simple curl failed"
+            
+            # Run health checks with proper retry
+            echo "Running health checks:"
             curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/health
             curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/api/health
       - run:
