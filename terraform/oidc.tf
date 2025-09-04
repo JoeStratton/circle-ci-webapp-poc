@@ -48,10 +48,10 @@ resource "aws_iam_role" "circleci_oidc_role" {
   })
 }
 
-# IAM Policy for CircleCI - ECS and ECR permissions
+# IAM Policy for CircleCI - ECS, ECR, and S3 permissions
 resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
   name        = "${var.project_name}-circleci-ecs-ecr-policy"
-  description = "Policy for CircleCI to manage ECS and ECR resources"
+  description = "Policy for CircleCI to manage ECS, ECR, S3, EC2, IAM, and CloudWatch resources"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -95,6 +95,84 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "iam:PassRole"
         ]
         Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-ecs-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # S3 permissions for Terraform state management
+          # Using s3:* for state bucket as Terraform needs to read all bucket attributes
+          "s3:*"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.state_bucket}",
+          "arn:aws:s3:::${var.state_bucket}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # EC2 permissions for VPC and networking
+          "ec2:DescribeVpcs",
+          "ec2:DescribeVpcAttribute",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # IAM permissions for role and policy management
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:CreateRole",
+          "iam:UpdateRole",
+          "iam:DeleteRole",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListRolePolicies",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:TagPolicy",
+          "iam:UntagPolicy"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # CloudWatch Logs permissions
+          "logs:DescribeLogGroups",
+          "logs:ListTagsForResource",
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:TagLogGroup",
+          "logs:UntagLogGroup"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # ECR additional permissions
+          "ecr:ListTagsForResource",
+          "ecr:TagResource",
+          "ecr:UntagResource",
+          "ecr:PutLifecyclePolicy",
+          "ecr:GetLifecyclePolicy",
+          "ecr:DeleteLifecyclePolicy"
+        ]
+        Resource = "*"
       }
     ]
   })

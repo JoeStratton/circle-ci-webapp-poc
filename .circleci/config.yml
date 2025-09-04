@@ -137,6 +137,8 @@ commands:
               -var="database_password=$DB_PASSWORD" \
               -out=tfplan \
               -detailed-exitcode
+          # Exit code 2 means changes needed, which is success for plan
+          exit_code: [0, 2]
       - run:
           name: Generate human-readable plan output
           command: |
@@ -152,11 +154,18 @@ commands:
       - store_artifacts:
           path: terraform/plan-output.txt
           destination: terraform-plan-output
+      - persist_to_workspace:
+          root: .
+          paths:
+            - terraform/tfplan
+            - terraform/plan-output.txt
 
   terraform-apply-with-auth:
     description: "Run Terraform apply with OIDC authentication and release updates"
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - configure-oidc-auth
       - run:
           name: Terraform apply
@@ -167,7 +176,8 @@ commands:
             
             cd terraform
             terraform init
-            terraform apply -auto-approve tfplan
+            # Apply the plan that was generated in the terraform-plan job
+            terraform apply tfplan
       - run:
           name: Update deploy to SUCCESS
           command: circleci run release update --status=SUCCESS
