@@ -3,7 +3,7 @@ version: 2.1
 # Orbs for enhanced functionality
 orbs:
   aws-cli: circleci/aws-cli@5.4.1
-  docker: circleci/docker@2.8.2
+  docker: circleci/docker@3.0.0
   python: circleci/python@3.2.0
 
 # Executors define the execution environment
@@ -126,8 +126,7 @@ jobs:
     executor: docker-executor
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - run:
           name: Build custom Docker image
           command: |
@@ -176,8 +175,7 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - run:
           name: Load Docker image from workspace
           command: |
@@ -196,8 +194,7 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - aws-cli/setup:
           region: $AWS_REGION
       - run:
