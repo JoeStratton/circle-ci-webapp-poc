@@ -43,21 +43,37 @@ GitHub → CircleCI → AWS ECS (Flask + PostgreSQL Sidecars)
 
 ### 5-Minute Setup
 ```bash
-# 1. Clone and push to your GitHub repository
+# 1. Clone and test locally
 git clone https://github.com/YOUR_USERNAME/circle-ci-webapp-poc.git
 cd circle-ci-webapp-poc
-git push origin main
-
-# 2. Test locally first (recommended)
 ./scripts/test-unit.sh  # Fast unit tests
-docker build --platform linux/amd64 -f docker/Dockerfile -t circle-ci-webapp-poc-app:latest .
 
-# 3. Deploy complete infrastructure (simplified one-step)
+# 2. Create S3 bucket for Terraform state (required first)
+aws s3 mb s3://YOUR_UNIQUE_BUCKET_NAME --region us-east-1
+
+# 3. Configure Terraform variables
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+# Edit terraform/terraform.tfvars with your values:
+# - circleci_organization_id (from CircleCI dashboard)
+# - circleci_project_id (from CircleCI dashboard)
+# - state_bucket (use the bucket name from step 2)
+
+# 4. Deploy infrastructure
 cd terraform
+terraform init
 terraform apply
 
-# 4. Configure CircleCI context with OIDC role
-# 5. Push to main branch triggers application deployment
+# 5. Configure CircleCI context
+# Add these environment variables to CircleCI project settings:
+# - AWS_ACCOUNT_ID
+# - AWS_ROLE_ARN (from terraform output)
+# - AWS_REGION
+# - DATABASE_PASSWORD
+# - CIRCLECI_ORGANIZATION_ID
+# - CIRCLECI_PROJECT_ID
+
+# 6. Push to main branch triggers deployment
+git push origin main
 ```
 
 ## 🧪 Testing Strategy
@@ -91,8 +107,8 @@ terraform apply
 
 ### Branch-Based Execution
 - **All Branches**: Code quality → Unit tests → Integration tests → Docker build → Container tests
-- **Main Branch Only**: + ECR push → Terraform deployment
-- **Dev Branches**: Full testing and Docker build, but no deployment
+- **Main Branch Only**: + ECR push → Terraform validation → Terraform plan → Terraform apply
+- **Dev Branches**: Full testing and Docker build, but no AWS deployment
 
 ### Terraform Integration
 - **Format Check**: `terraform fmt -check` validates code formatting
@@ -160,21 +176,36 @@ circle-ci-webapp-poc/
 │   ├── routes.py            # Flask routes and API endpoints
 │   ├── config.py            # Application configuration
 │   ├── requirements.txt     # Python dependencies
-│   ├── pytest.ini           # Test configuration
 │   ├── templates/           # HTML templates
 │   │   └── index.html       # Main web interface
 │   ├── static/              # Static assets
 │   │   ├── css/style.css    # Styles with dark mode support
 │   │   └── js/app.js        # JavaScript functionality
-│   └── tests/               # Three-stage test suite
+│   └── tests/               # Test suite
+│       ├── pytest.ini      # Test configuration
+│       ├── conftest.py      # Test fixtures
+│       ├── test_app.py      # Unit tests
+│       ├── test_app_init.py # App initialization tests
+│       └── test_container.py # Container tests
 │
 ├── 📂 docker/                # Container configuration
 │   ├── Dockerfile           # Multi-stage container build
 │   └── .dockerignore        # Docker build exclusions
 │
 ├── 📂 terraform/             # Complete infrastructure (OIDC, IAM, ECS, ECR, S3)
-├── 📂 .circleci/             # CI/CD pipeline with terraform integration
-└── 📂 scripts/               # Independent test scripts and database initialization
+│   ├── main.tf              # Main Terraform configuration
+│   ├── variables.tf         # Input variables
+│   ├── terraform.tfvars.example # Example variables file
+│   ├── ecs.tf               # ECS cluster and service
+│   ├── ecr.tf               # ECR repository
+│   ├── iam.tf               # IAM roles and policies
+│   ├── oidc.tf              # OIDC configuration
+│   └── outputs.tf           # Output values
+│
+├── 📂 .circleci/             # CI/CD pipeline
+│   └── config.yml           # CircleCI configuration
+│
+└── 📂 scripts/               # Test scripts and utilities
     ├── test-unit.sh         # Unit tests (pytest + SQLite + JUnit XML)
     ├── test-integration.sh  # Integration tests (pytest + PostgreSQL sidecar)
     ├── test-container.sh    # Container tests (dgoss + pytest)
