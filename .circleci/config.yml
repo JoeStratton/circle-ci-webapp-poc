@@ -235,6 +235,10 @@ jobs:
           command: |
             docker load -i docker-image.tar
             
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
             # Get ECR repository URL
             ECR_URI=$(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text)
             
@@ -244,6 +248,10 @@ jobs:
       - run:
           name: Login to ECR and push image
           command: |
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
             # Login to ECR
             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
             
@@ -428,83 +436,29 @@ jobs:
 # Workflows define job orchestration with branch-based conditions
 workflows:
   version: 2
-  
-  # Development workflow - runs on all branches except main
-  development:
+  build-test-deploy:
     jobs:
-      # Code quality - runs on all branches except main
-      - lint-and-format:
-          filters:
-            branches:
-              ignore: main
+      # Code quality - runs on all branches
+      - lint-and-format
       
-      # Unit tests - runs on all branches except main
-      - unit-tests:
-          filters:
-            branches:
-              ignore: main
+      # Unit tests - runs on all branches
+      - unit-tests
       
-      # Integration tests with PostgreSQL sidecar - runs on all branches except main
-      - integration-tests:
-          filters:
-            branches:
-              ignore: main
+      # Integration tests with PostgreSQL sidecar - runs on all branches
+      - integration-tests
       
-      # Build and test Docker image - runs on all branches except main
-      - build-and-test-image:
-          filters:
-            branches:
-              ignore: main
+      # Build and test Docker image - runs on all branches
+      - build-and-test-image
       
-      # Container tests with dgoss - runs on all branches except main
+      # Container tests with dgoss - runs on all branches
+
       - container-tests:
           requires:
             - lint-and-format
             - unit-tests
             - integration-tests
             - build-and-test-image
-          filters:
-            branches:
-              ignore: main
-  
-  # Production workflow - runs only on main branch
-  production:
-    jobs:
-      # Code quality - runs on main
-      - lint-and-format:
-          filters:
-            branches:
-              only: main
-      
-      # Unit tests - runs on main
-      - unit-tests:
-          filters:
-            branches:
-              only: main
-      
-      # Integration tests with PostgreSQL sidecar - runs on main
-      - integration-tests:
-          filters:
-            branches:
-              only: main
-      
-      # Build and test Docker image - runs on main
-      - build-and-test-image:
-          filters:
-            branches:
-              only: main
-      
-      # Container tests with dgoss - runs on main
-      - container-tests:
-          requires:
-            - lint-and-format
-            - unit-tests
-            - integration-tests
-            - build-and-test-image
-          filters:
-            branches:
-              only: main
-      
+     
       # Push to ECR - MAIN BRANCH ONLY
       - push-to-ecr:
           requires:
@@ -526,7 +480,7 @@ workflows:
             - aws-production
       
       # Terraform approval - MAIN BRANCH ONLY
-      - hold:
+      - manual-approval:
           type: approval
           requires:
             - terraform-plan
@@ -537,7 +491,7 @@ workflows:
       # Deploy with Terraform - MAIN BRANCH ONLY
       - deploy-with-terraform:
           requires:
-            - hold
+            - manual-approval
           filters:
             branches:
               only: main
