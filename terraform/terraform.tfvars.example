@@ -1,0 +1,40 @@
+# Terraform Variables Example - Combined Infrastructure
+# Copy this file to terraform.tfvars and customize for your environment
+
+# AWS Configuration
+aws_region   = "us-east-1"
+project_name = "circleci-demo"
+environment  = "dev"
+
+# CircleCI OIDC Configuration (get from CircleCI dashboard)
+circleci_organization_id = "12345678-1234-1234-1234-123456789012"  # Required
+circleci_project_id = "87654321-4321-4321-4321-210987654321"       # Required
+allowed_branches = ["main"]
+
+# Cost Optimization Settings
+enable_fargate_spot = true  # 70% cost savings vs on-demand
+
+# Resource Configuration
+ecs_cpu    = 256  # Minimum for cost optimization
+ecs_memory = 512  # Minimum for cost optimization
+
+# Retention Policies (minimal cost)
+ecr_image_retention_count      = 3   # Keep last 3 images
+s3_artifact_retention_days     = 7   # Delete artifacts after 7 days
+cloudwatch_log_retention_days  = 1   # 1 day log retention
+
+# Database Configuration
+# Note: DB_USERNAME and DB_PASSWORD are provided via CircleCI context
+# No database credentials in terraform files (security best practice)
+
+# State Management
+# Note: S3 bucket must be created manually before terraform init
+state_bucket = "joes-circleci-demo-poc-state"
+
+# Tags
+common_tags = {
+  Project     = "circleci-demo"
+  Environment = "dev"
+  ManagedBy   = "terraform"
+  Owner       = "joe"
+}

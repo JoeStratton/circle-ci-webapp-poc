@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CircleCI Demo App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header with dark mode toggle -->
+        <header class="header">
+            <h1>CircleCI Demo POC</h1>
+            <div class="dark-mode-toggle">
+                <input type="checkbox" id="darkModeToggle" class="toggle-input">
+                <label for="darkModeToggle" class="toggle-label">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-text">Dark Mode</span>
+                </label>
+            </div>
+        </header>
+        
+        <!-- Application Status Card -->
+        <div class="card info">
+            <h3>Application Status</h3>
+            <p><strong>Status:</strong> {{ status }}</p>
+            <p><strong>Database:</strong> {{ db_status }}</p>
+            <p><strong>Environment:</strong> {{ environment }}</p>
+        </div>
+        
+        <!-- Database Operations Card -->
+        <div class="card">
+            <h3>Database Operations</h3>
+            <button class="btn btn-primary" onclick="testDatabase()">Test Database Connection</button>
+            <button class="btn btn-success" onclick="createUser()">Create Test User</button>
+            <div id="dbResult"></div>
+        </div>
+        
+        <!-- User Management Card -->
+        <div class="card">
+            <h3>User Management</h3>
+            <div class="form-group">
+                <input type="text" id="username" placeholder="Username" class="form-input">
+                <input type="email" id="email" placeholder="Email" class="form-input">
+                <button class="btn btn-primary" onclick="addUser()">Add User</button>
+            </div>
+            <div id="userResult"></div>
+        </div>
+        
+        <!-- Recent Users Card -->
+        <div class="card">
+            <h3>Recent Users</h3>
+            <div id="userList" class="user-list">
+                {% for user in users %}
+                <div class="user-item">
+                    <strong>{{ user.username }}</strong> 
+                    <span class="user-email">({{ user.email }})</span>
+                    <span class="user-date">{{ user.created_at }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

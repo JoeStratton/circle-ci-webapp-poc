@@ -1,0 +1,395 @@
+version: 2.1
+
+# Orbs for enhanced functionality
+orbs:
+  aws-cli: circleci/aws-cli@4.0
+  docker: circleci/docker@2.2
+  python: circleci/python@2.1
+
+# Executors define the execution environment
+executors:
+  python-executor:
+    docker:
+      - image: cimg/python:3.11
+    working_directory: ~/project
+    
+  docker-executor:
+    docker:
+      - image: cimg/base:stable
+    working_directory: ~/project
+
+  terraform-executor:
+    docker:
+      - image: hashicorp/terraform:1.13.1
+    working_directory: ~/project
+
+# Commands for reusable logic
+commands:
+  setup-dependencies:
+    description: "Install Python dependencies and setup environment"
+    steps:
+      - checkout
+      - python/install-packages:
+          pkg-manager: pip
+          pip-dependency-file: app/requirements.txt
+      - run:
+          name: Install additional test dependencies
+          command: |
+            pip install pytest-xdist pytest-mock bandit flake8
+            
+  run-tests-with-db:
+    description: "Run tests with PostgreSQL database and collect results for CircleCI"
+    steps:
+      - run:
+          name: Install dockerize for database wait
+          command: |
+            wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+            sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+            rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+          environment:
+            DOCKERIZE_VERSION: v0.6.1
+      - run:
+          name: Wait for database
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Run integration tests with dedicated script
+          command: |
+            export DATABASE_URL="postgresql://testuser:testpass@localhost:5432/testdb"
+            ./scripts/test-integration.sh
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+          destination: test-results
+      - store_artifacts:
+          path: coverage
+          destination: coverage
+
+  security-scan:
+    description: "Run security scans and compliance checks"
+    steps:
+      - run:
+          name: Security scan with bandit
+          command: |
+            bandit -r app/app.py -f json -o security-report.json || true
+            bandit -r app/app.py -f txt
+      - store_artifacts:
+          path: security-report.json
+          destination: security-report.json
+
+# Job definitions
+jobs:
+  # Code quality and linting
+  lint-and-format:
+    executor: python-executor
+    steps:
+      - setup-dependencies
+      - run:
+          name: Run linting checks
+          command: |
+            echo "Running code quality checks..."
+            flake8 app/app.py --max-line-length=120 --statistics
+            python -m py_compile app/app.py
+            echo "✅ Code quality checks passed"
+      - run:
+          name: Check requirements
+          command: |
+            pip check
+            echo "✅ Dependencies are compatible"
+
+  # Unit tests without database
+  unit-tests:
+    executor: python-executor
+    steps:
+      - setup-dependencies
+      - run:
+          name: Run unit tests with dedicated script
+          command: |
+            ./scripts/test-unit.sh
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+          destination: unit-test-results
+      - store_artifacts:
+          path: coverage
+          destination: unit-coverage
+
+  # Integration tests with PostgreSQL sidecar 
+  integration-tests:
+    executor: python-executor
+    docker:
+      - image: cimg/python:3.11
+        environment:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+          FLASK_ENV: testing
+      - image: cimg/postgres:13.8
+        environment:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+    steps:
+      - setup-dependencies
+      - run-tests-with-db
+      - security-scan
+
+  # Build and test custom Docker image 
+  build-and-test-image:
+    executor: docker-executor
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.14
+      - run:
+          name: Build custom Docker image
+          command: |
+            echo "Building custom Docker image for linux/amd64..."
+            docker build --platform linux/amd64 -f docker/Dockerfile -t circleci-demo-app:${CIRCLE_SHA1} .
+            docker tag circleci-demo-app:${CIRCLE_SHA1} circleci-demo-app:latest
+            echo "✅ Docker image built successfully"
+      - run:
+          name: Test Docker image with container health checks
+          command: |
+            echo "Testing Docker image functionality..."
+            
+            # Test image with SQLite (no external dependencies for basic test)
+            docker run -d --name test-app \
+              -e DATABASE_URL=sqlite:///test.db \
+              -e FLASK_ENV=testing \
+              -p 5000:5000 \
+              circleci-demo-app:${CIRCLE_SHA1}
+            
+            # Wait for application startup
+            sleep 20
+            
+            # Test health endpoint
+            docker exec test-app curl -f http://localhost:5000/health || exit 1
+            
+            # Test API endpoint
+            docker exec test-app curl -f http://localhost:5000/api/health || exit 1
+            
+            echo "✅ Docker image tests passed"
+            
+            # Cleanup
+            docker stop test-app && docker rm test-app
+      - run:
+          name: Save Docker image for workspace
+          command: |
+            docker save circleci-demo-app:${CIRCLE_SHA1} -o docker-image.tar
+      - persist_to_workspace:
+          root: .
+          paths:
+            - docker-image.tar
+
+  # Container testing with dgoss (requirement #3)
+  container-tests:
+    executor: docker-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup_remote_docker:
+          version: 20.10.14
+      - run:
+          name: Load Docker image from workspace
+          command: |
+            docker load -i docker-image.tar
+      - run:
+          name: Run container tests with dedicated script
+          command: |
+            ./scripts/test-container.sh
+      - store_artifacts:
+          path: test-results
+          destination: container-test-results
+
+  # Push Docker image to ECR (main branch only)
+  push-to-ecr:
+    executor: docker-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup_remote_docker:
+          version: 20.10.14
+      - aws-cli/setup:
+          role-arn: $AWS_ROLE_ARN  # OIDC role for secure authentication
+          region: $AWS_REGION
+      - run:
+          name: Load and tag Docker image
+          command: |
+            docker load -i docker-image.tar
+            
+            # Get ECR repository URL
+            ECR_URI=$(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text)
+            
+            # Tag image for ECR
+            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:${CIRCLE_SHA1}
+            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:latest
+      - run:
+          name: Login to ECR and push image
+          command: |
+            # Login to ECR
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
+            
+            # Push images
+            ECR_URI=$(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text)
+            docker push $ECR_URI:${CIRCLE_SHA1}
+            docker push $ECR_URI:latest
+            
+            echo "✅ Images pushed to ECR successfully"
+      - run:
+          name: Create deployment artifact
+          command: |
+            mkdir -p artifacts
+            cat > artifacts/deployment-info.json << EOF
+            {
+              "commit_sha": "${CIRCLE_SHA1}",
+              "branch": "${CIRCLE_BRANCH}",
+              "build_num": "${CIRCLE_BUILD_NUM}",
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "image_tag": "${CIRCLE_SHA1}",
+              "environment": "production"
+            }
+            EOF
+      - store_artifacts:
+          path: artifacts
+          destination: deployment-artifacts
+
+  # Deploy complete infrastructure with Terraform (simplified single-layer)
+  deploy-with-terraform:
+    executor: terraform-executor
+    steps:
+      - checkout
+      - aws-cli/setup:
+          role-arn: $AWS_ROLE_ARN  # OIDC role for secure authentication
+          region: $AWS_REGION
+      - run:
+          name: Terraform format and validate
+          command: |
+            cd terraform
+            terraform fmt -check -recursive
+            terraform init
+            terraform validate
+      - run:
+          name: Terraform plan (combined infrastructure)
+          command: |
+            cd terraform
+            terraform plan \
+              -var="circleci_organization_id=$CIRCLECI_ORGANIZATION_ID" \
+              -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
+              -var="database_username=$DB_USERNAME" \
+              -var="database_password=$DB_PASSWORD" \
+              -out=tfplan
+      - run:
+          name: Terraform apply (cost-optimized infrastructure)
+          command: |
+            cd terraform
+            terraform apply -auto-approve tfplan
+            
+            # Get outputs for ECS deployment
+            ECR_URI=$(terraform output -raw ecr_repository_url)
+            ECS_CLUSTER=$(terraform output -raw ecs_cluster_name)
+            ECS_SERVICE=$(terraform output -raw ecs_service_name)
+            TASK_FAMILY=$(terraform output -raw task_definition_family)
+            
+            echo "Infrastructure deployed successfully"
+            echo "ECR URI: $ECR_URI"
+            echo "ECS Cluster: $ECS_CLUSTER"
+            echo "ECS Service: $ECS_SERVICE"
+      - run:
+          name: Update ECS service with new image
+          command: |
+            cd terraform
+            ECR_URI=$(terraform output -raw ecr_repository_url)
+            ECS_CLUSTER=$(terraform output -raw ecs_cluster_name)
+            ECS_SERVICE=$(terraform output -raw ecs_service_name)
+            TASK_FAMILY=$(terraform output -raw task_definition_family)
+            
+            # Get current task definition
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY --query taskDefinition)
+            
+            # Update image URI in task definition
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$ECR_URI:$CIRCLE_SHA1" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            
+            # Register new task definition
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
+            
+            # Update ECS service
+            aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
+            
+            # Wait for deployment to complete
+            aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+            
+            echo "✅ ECS service updated successfully"
+      - store_artifacts:
+          path: terraform/tfplan
+          destination: terraform-plan
+
+
+
+# Workflows define job orchestration with branch-based conditions
+workflows:
+  version: 2
+  
+  # Main workflow - build and test on all branches, deploy only on main
+  build-test-deploy:
+    jobs:
+      # Code quality - runs on all branches
+      - lint-and-format:
+          filters:
+            tags:
+              only: /.*/
+      
+      # Unit tests - runs on all branches  
+      - unit-tests:
+          requires:
+            - lint-and-format
+          filters:
+            tags:
+              only: /.*/
+      
+      # Integration tests with PostgreSQL sidecar - runs on all branches
+      - integration-tests:
+          requires:
+            - unit-tests
+          filters:
+            tags:
+              only: /.*/
+      
+      # Build and test Docker image - runs on ALL branches (dev + main)
+      - build-and-test-image:
+          requires:
+            - integration-tests
+          filters:
+            tags:
+              only: /.*/
+      
+      # Container tests with dgoss - runs on ALL branches (dev + main)
+      - container-tests:
+          requires:
+            - build-and-test-image
+          filters:
+            tags:
+              only: /.*/
+      
+      # Push to ECR - MAIN BRANCH ONLY
+      - push-to-ecr:
+          requires:
+            - container-tests
+          filters:
+            branches:
+              only: main
+          context:
+            - aws-production
+      
+      # Deploy with Terraform - MAIN BRANCH ONLY
+      - deploy-with-terraform:
+          requires:
+            - push-to-ecr
+          filters:
+            branches:
+              only: main
+          context:
+            - aws-production
+
+

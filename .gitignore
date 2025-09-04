@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+*.pyo
+.Python
+.coverage
+.pytest_cache/
+test-results/
+coverage/
+*.log
+.env
+.venv
+venv/
+.DS_Store
+*.swp
+
+# Docs
+SETUP.md
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars
+
+# Testing
+dgoss
+goss
+goss.yaml
+
+# Certificates
+*.crt

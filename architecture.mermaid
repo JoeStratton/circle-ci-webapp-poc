@@ -1,0 +1,62 @@
+graph TB    
+    subgraph "CircleCI Pipeline POC"
+        F[Lint & Format<br/>Code Quality] --> G[Unit Tests<br/>pytest + SQLite + JUnit XML]
+        G --> H[Integration Tests<br/>pytest + PostgreSQL Sidecar]
+        H --> I[Build & Test Image<br/>Multi-stage Docker + dgoss]
+        I --> J[Container Tests<br/>dgoss + pytest validation]
+        J --> K{Branch Check}
+        K -->|main| N[Push to ECR<br/>OIDC Authentication]
+        K -->|dev| M[Stop Here - No Deploy]
+        N --> O[Deploy with Terraform<br/>Infrastructure as Code]
+    end
+    
+    subgraph "AWS Infrastructure"
+        P[ECR Repository<br/>3 Image Retention]
+        Q[ECS Fargate Spot<br/>Flask + PostgreSQL Sidecar]
+        R[CircleCI Contexts<br/>Encrypted Credentials]
+        S[S3 Artifacts<br/>7-day Lifecycle]
+        T[CloudWatch Logs<br/>1-day Retention]
+    end
+    
+    subgraph "Application Containers"
+        U[PostgreSQL Sidecar<br/>postgres:13 off-the-shelf]
+        V[Flask App Container<br/>Connects to localhost:5432]
+        W[Web Interface<br/>HTML5 + CSS3 + JavaScript]
+    end
+    
+    subgraph "Security & Access"
+        Z[OIDC Provider<br/>No Static Keys]
+        AA[IAM Role<br/>Least Privilege]
+        BB[Branch Restrictions<br/>Main Only Deploy]
+    end
+    
+    %% Connections
+    N --> P
+    O --> Q
+    Q --> U
+    Q --> V
+    V --> W
+    R --> U
+    R --> V
+    O --> S
+    Q --> T
+    Z --> O
+    AA --> O
+    BB --> N
+    
+    %% Styling
+    classDef pipeline fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef aws fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef application fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef security fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef decision fill:#fff9c4,stroke:#f9a825,stroke-width:3px
+    classDef deploy fill:#e1f5fe,stroke:#0288d1,stroke-width:3px
+    classDef web fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    
+    class F,G,H,I,J pipeline
+    class P,Q,S,T aws
+    class U,V application
+    class W web
+    class Z,AA,BB security
+    class K decision
+    class N,O deploy

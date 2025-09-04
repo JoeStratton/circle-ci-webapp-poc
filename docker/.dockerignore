@@ -1,0 +1,17 @@
+**/.git
+**/.DS_Store
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.coverage
+**/coverage
+**/test-results
+**/.env*
+**/README.md
+**/SETUP.md
+app/tests
+scripts
+.circleci
+terraform
+setup
+docker
