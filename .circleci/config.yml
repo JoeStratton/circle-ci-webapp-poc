@@ -7,7 +7,6 @@ orbs:
   docker: circleci/docker@3.0.0
   python: circleci/python@3.2.0
   terraform: circleci/terraform@3.7
-  aws-ecs: circleci/aws-ecs@7.1.0
 
 # Executors define the execution environment
 executors:
@@ -265,7 +264,6 @@ jobs:
 
 # Workflows define job orchestration with branch-based conditions
 workflows:
-  version: 2
   build-test-deploy:
     jobs:
       # Phase 1: Code Quality and Testing (runs on all branches in parallel)
