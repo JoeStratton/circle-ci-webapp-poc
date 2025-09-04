@@ -1,4 +1,4 @@
-# CircleCI WebApp POC
+# CircleCI WebApp POC 
 
 ** AWS Cost-optimized CI/CD pipeline demonstration **
 
@@ -122,7 +122,7 @@ class HealthCheck(db.Model):
     # Tracks application and database health status
 ```
 
-## 🔧 Key Technologies
+## 🔧 Key Technologies 
 
 ### Application Stack
 - **Language**: Python
