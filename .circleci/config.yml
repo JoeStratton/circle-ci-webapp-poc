@@ -162,6 +162,8 @@ jobs:
             dockerize -wait tcp://localhost:5432 -timeout 1m
           environment:
             DOCKERIZE_VERSION: v0.9.6
+          requires:
+            - image: cimg/postgres:13.8
       - run:
           name: Start app container and run health checks
           command: |
@@ -172,33 +174,10 @@ jobs:
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
             
-            # Debug: Check container status
-            echo "Container status:"
-            docker ps -a
-            echo "Container logs:"
-            docker logs test-app
-            echo "Container processes:"
-            docker exec test-app ps aux || echo "Cannot exec into container"
-            
-            # Wait for app to start and run health checks
-            sleep 30
-            echo "Checking container status again:"
-            docker ps -a
-            echo "Container logs before health check:"
-            docker logs test-app --tail 20
-            
-            # Test connectivity first
-            echo "Testing port connectivity:"
-            nc -z localhost 5000 && echo "Port 5000 is open" || echo "Port 5000 is not accessible"
-            
-            # Test with a simple curl first
-            echo "Testing simple curl:"
-            curl -v http://localhost:5000/health || echo "Simple curl failed"
-            
             # Run health checks with proper retry
             echo "Running health checks:"
-            curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/health
-            curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/api/health
+            curl --fail --retry 10 --retry-connrefused --retry-delay 5 http://localhost:5000/health
+            curl --fail --retry 10 --retry-connrefused --retry-delay 5 http://localhost:5000/api/health
       - run:
           name: Cleanup
           command: |
