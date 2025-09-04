@@ -208,6 +208,12 @@ jobs:
           role_arn: $AWS_ROLE_ARN
       - terraform/init:
           path: terraform
+      - run:
+          name: Set Terraform variables
+          command: |
+            export TF_VAR_circleci_organization_id="$CIRCLECI_ORGANIZATION_ID"
+            export TF_VAR_circleci_project_id="$CIRCLECI_PROJECT_ID"
+            export TF_VAR_database_password="$DATABASE_PASSWORD"
       - terraform/validate:
           path: terraform
 
@@ -221,6 +227,12 @@ jobs:
           role_arn: $AWS_ROLE_ARN
       - terraform/init:
           path: terraform
+      - run:
+          name: Set Terraform variables
+          command: |
+            export TF_VAR_circleci_organization_id="$CIRCLECI_ORGANIZATION_ID"
+            export TF_VAR_circleci_project_id="$CIRCLECI_PROJECT_ID"
+            export TF_VAR_database_password="$DATABASE_PASSWORD"
       - terraform/plan:
           path: terraform
           out: tfplan
@@ -237,6 +249,12 @@ jobs:
           role_arn: $AWS_ROLE_ARN
       - attach_workspace:
           at: .
+      - run:
+          name: Set Terraform variables
+          command: |
+            export TF_VAR_circleci_organization_id="$CIRCLECI_ORGANIZATION_ID"
+            export TF_VAR_circleci_project_id="$CIRCLECI_PROJECT_ID"
+            export TF_VAR_database_password="$DATABASE_PASSWORD"
       - terraform/apply:
           path: terraform
           plan: tfplan
