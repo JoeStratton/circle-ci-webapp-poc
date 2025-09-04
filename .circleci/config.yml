@@ -236,11 +236,14 @@ jobs:
   tf-apply-oidc:
     executor: terraform-executor
     steps:
+      - checkout
       - aws-cli/setup:
           region: $AWS_REGION
           role_arn: $AWS_ROLE_ARN
       - attach_workspace:
           at: .
+      - terraform/init:
+          path: terraform
       - terraform/apply:
           path: terraform
           plan: tfplan
