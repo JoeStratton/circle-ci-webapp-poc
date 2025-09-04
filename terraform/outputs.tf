@@ -11,10 +11,6 @@ output "ecr_repository_name" {
   value       = aws_ecr_repository.app_repo.name
 }
 
-output "s3_bucket_name" {
-  description = "S3 bucket name for artifacts"
-  value       = aws_s3_bucket.artifacts.bucket
-}
 
 output "ecs_cluster_name" {
   description = "ECS cluster name"

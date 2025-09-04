@@ -34,9 +34,6 @@ resource "aws_iam_role" "circleci_oidc_role" {
         Condition = {
           StringEquals = {
             "oidc.circleci.com/org/${var.circleci_organization_id}:aud" = var.circleci_organization_id
-            "oidc.circleci.com/org/${var.circleci_organization_id}:ref" = [
-              for branch in var.allowed_branches : "refs/heads/${branch}"
-            ]
           }
           StringLike = {
             "oidc.circleci.com/org/${var.circleci_organization_id}:sub" = "org/${var.circleci_organization_id}/project/${var.circleci_project_id}/user/*"
