@@ -205,6 +205,26 @@ jobs:
       - run:
           name: Configure OIDC Authentication
           command: |
+            # Debug environment variables
+            echo "Checking required environment variables..."
+            echo "AWS_REGION: ${AWS_REGION:-'NOT SET'}"
+            echo "CIRCLE_OIDC_TOKEN: ${CIRCLE_OIDC_TOKEN:0:20}..." 
+            echo "AWS_ROLE_ARN: ${AWS_ROLE_ARN:-'NOT SET'}"
+            
+            # Check if required variables are set
+            if [ -z "$AWS_REGION" ]; then
+              echo "ERROR: AWS_REGION is not set"
+              exit 1
+            fi
+            if [ -z "$CIRCLE_OIDC_TOKEN" ]; then
+              echo "ERROR: CIRCLE_OIDC_TOKEN is not set"
+              exit 1
+            fi
+            if [ -z "$AWS_ROLE_ARN" ]; then
+              echo "ERROR: AWS_ROLE_ARN is not set"
+              exit 1
+            fi
+            
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
             # Export the OIDC token for AWS CLI
@@ -265,6 +285,26 @@ jobs:
       - run:
           name: Configure OIDC Authentication
           command: |
+            # Debug environment variables
+            echo "Checking required environment variables..."
+            echo "AWS_REGION: ${AWS_REGION:-'NOT SET'}"
+            echo "CIRCLE_OIDC_TOKEN: ${CIRCLE_OIDC_TOKEN:0:20}..." 
+            echo "AWS_ROLE_ARN: ${AWS_ROLE_ARN:-'NOT SET'}"
+            
+            # Check if required variables are set
+            if [ -z "$AWS_REGION" ]; then
+              echo "ERROR: AWS_REGION is not set"
+              exit 1
+            fi
+            if [ -z "$CIRCLE_OIDC_TOKEN" ]; then
+              echo "ERROR: CIRCLE_OIDC_TOKEN is not set"
+              exit 1
+            fi
+            if [ -z "$AWS_ROLE_ARN" ]; then
+              echo "ERROR: AWS_ROLE_ARN is not set"
+              exit 1
+            fi
+            
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
             # Export the OIDC token for AWS CLI
@@ -311,6 +351,26 @@ jobs:
       - run:
           name: Configure OIDC Authentication
           command: |
+            # Debug environment variables
+            echo "Checking required environment variables..."
+            echo "AWS_REGION: ${AWS_REGION:-'NOT SET'}"
+            echo "CIRCLE_OIDC_TOKEN: ${CIRCLE_OIDC_TOKEN:0:20}..." 
+            echo "AWS_ROLE_ARN: ${AWS_ROLE_ARN:-'NOT SET'}"
+            
+            # Check if required variables are set
+            if [ -z "$AWS_REGION" ]; then
+              echo "ERROR: AWS_REGION is not set"
+              exit 1
+            fi
+            if [ -z "$CIRCLE_OIDC_TOKEN" ]; then
+              echo "ERROR: CIRCLE_OIDC_TOKEN is not set"
+              exit 1
+            fi
+            if [ -z "$AWS_ROLE_ARN" ]; then
+              echo "ERROR: AWS_ROLE_ARN is not set"
+              exit 1
+            fi
+            
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
             # Export the OIDC token for AWS CLI
@@ -378,25 +438,25 @@ workflows:
       # Code quality - runs on all branches
       - lint-and-format:
           filters:
-            tags:
+            branches:
               only: /.*/
       
       # Unit tests - runs on all branches  
       - unit-tests:
           filters:
-            tags:
+            branches:
               only: /.*/
       
       # Integration tests with PostgreSQL sidecar - runs on all branches
       - integration-tests:
           filters:
-            tags:
+            branches:
               only: /.*/
       
       # Build and test Docker image - runs on ALL branches (dev + main)
       - build-and-test-image:
           filters:
-            tags:
+            branches:
               only: /.*/
       
       # Container tests with dgoss - runs on ALL branches (dev + main)
@@ -407,7 +467,7 @@ workflows:
             - integration-tests
             - build-and-test-image
           filters:
-            tags:
+            branches:
               only: /.*/
       
       # Push to ECR - MAIN BRANCH ONLY
