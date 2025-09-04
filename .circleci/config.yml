@@ -431,19 +431,30 @@ workflows:
   
   # Development workflow - runs on all branches except main
   development:
-    when: << pipeline.git.branch != "main" >>
     jobs:
       # Code quality - runs on all branches except main
-      - lint-and-format
+      - lint-and-format:
+          filters:
+            branches:
+              ignore: main
       
       # Unit tests - runs on all branches except main
-      - unit-tests
+      - unit-tests:
+          filters:
+            branches:
+              ignore: main
       
       # Integration tests with PostgreSQL sidecar - runs on all branches except main
-      - integration-tests
+      - integration-tests:
+          filters:
+            branches:
+              ignore: main
       
       # Build and test Docker image - runs on all branches except main
-      - build-and-test-image
+      - build-and-test-image:
+          filters:
+            branches:
+              ignore: main
       
       # Container tests with dgoss - runs on all branches except main
       - container-tests:
@@ -452,22 +463,36 @@ workflows:
             - unit-tests
             - integration-tests
             - build-and-test-image
+          filters:
+            branches:
+              ignore: main
   
   # Production workflow - runs only on main branch
   production:
-    when: << pipeline.git.branch == "main" >>
     jobs:
       # Code quality - runs on main
-      - lint-and-format
+      - lint-and-format:
+          filters:
+            branches:
+              only: main
       
       # Unit tests - runs on main
-      - unit-tests
+      - unit-tests:
+          filters:
+            branches:
+              only: main
       
       # Integration tests with PostgreSQL sidecar - runs on main
-      - integration-tests
+      - integration-tests:
+          filters:
+            branches:
+              only: main
       
       # Build and test Docker image - runs on main
-      - build-and-test-image
+      - build-and-test-image:
+          filters:
+            branches:
+              only: main
       
       # Container tests with dgoss - runs on main
       - container-tests:
@@ -476,11 +501,17 @@ workflows:
             - unit-tests
             - integration-tests
             - build-and-test-image
+          filters:
+            branches:
+              only: main
       
       # Push to ECR - MAIN BRANCH ONLY
       - push-to-ecr:
           requires:
             - container-tests
+          filters:
+            branches:
+              only: main
           context:
             - aws-production
       
@@ -488,6 +519,9 @@ workflows:
       - terraform-plan:
           requires:
             - push-to-ecr
+          filters:
+            branches:
+              only: main
           context:
             - aws-production
       
@@ -496,11 +530,17 @@ workflows:
           type: approval
           requires:
             - terraform-plan
+          filters:
+            branches:
+              only: main
       
       # Deploy with Terraform - MAIN BRANCH ONLY
       - deploy-with-terraform:
           requires:
             - hold
+          filters:
+            branches:
+              only: main
           context:
             - aws-production
 
