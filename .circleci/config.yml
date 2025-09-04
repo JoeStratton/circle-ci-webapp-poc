@@ -205,28 +205,8 @@ jobs:
       - run:
           name: Configure OIDC Authentication
           command: |
-            # Debug environment variables
-            echo "Checking required environment variables..."
-            echo "AWS_REGION: ${AWS_REGION:-'NOT SET'}"
-            echo "CIRCLE_OIDC_TOKEN: ${CIRCLE_OIDC_TOKEN:0:20}..." 
-            echo "AWS_ROLE_ARN: ${AWS_ROLE_ARN:-'NOT SET'}"
-            
-            # Check if required variables are set
-            if [ -z "$AWS_REGION" ]; then
-              echo "ERROR: AWS_REGION is not set"
-              exit 1
-            fi
-            if [ -z "$CIRCLE_OIDC_TOKEN" ]; then
-              echo "ERROR: CIRCLE_OIDC_TOKEN is not set"
-              exit 1
-            fi
-            if [ -z "$AWS_ROLE_ARN" ]; then
-              echo "ERROR: AWS_ROLE_ARN is not set"
-              exit 1
-            fi
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
-            # Export the OIDC token for AWS CLI
             echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
             export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
@@ -240,7 +220,7 @@ jobs:
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
             
             # Get ECR repository URL
-            ECR_URI=$(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text)
+            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
             
             # Tag image for ECR
             docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:${CIRCLE_SHA1}
@@ -253,10 +233,10 @@ jobs:
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
             
             # Login to ECR
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
             
             # Push images
-            ECR_URI=$(aws ecr describe-repositories --repository-names circleci-demo-app --query 'repositories[0].repositoryUri' --output text)
+            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
             docker push $ECR_URI:${CIRCLE_SHA1}
             docker push $ECR_URI:latest
             
@@ -292,28 +272,8 @@ jobs:
       - run:
           name: Configure OIDC Authentication
           command: |
-            # Debug environment variables
-            echo "Checking required environment variables..."
-            echo "AWS_REGION: ${AWS_REGION:-'NOT SET'}"
-            echo "CIRCLE_OIDC_TOKEN: ${CIRCLE_OIDC_TOKEN:0:20}..." 
-            echo "AWS_ROLE_ARN: ${AWS_ROLE_ARN:-'NOT SET'}"
-            
-            # Check if required variables are set
-            if [ -z "$AWS_REGION" ]; then
-              echo "ERROR: AWS_REGION is not set"
-              exit 1
-            fi
-            if [ -z "$CIRCLE_OIDC_TOKEN" ]; then
-              echo "ERROR: CIRCLE_OIDC_TOKEN is not set"
-              exit 1
-            fi
-            if [ -z "$AWS_ROLE_ARN" ]; then
-              echo "ERROR: AWS_ROLE_ARN is not set"
-              exit 1
-            fi
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
-            # Export the OIDC token for AWS CLI
             echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
             export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
@@ -357,28 +317,8 @@ jobs:
       - run:
           name: Configure OIDC Authentication
           command: |
-            # Debug environment variables
-            echo "Checking required environment variables..."
-            echo "AWS_REGION: ${AWS_REGION:-'NOT SET'}"
-            echo "CIRCLE_OIDC_TOKEN: ${CIRCLE_OIDC_TOKEN:0:20}..." 
-            echo "AWS_ROLE_ARN: ${AWS_ROLE_ARN:-'NOT SET'}"
-            
-            # Check if required variables are set
-            if [ -z "$AWS_REGION" ]; then
-              echo "ERROR: AWS_REGION is not set"
-              exit 1
-            fi
-            if [ -z "$CIRCLE_OIDC_TOKEN" ]; then
-              echo "ERROR: CIRCLE_OIDC_TOKEN is not set"
-              exit 1
-            fi
-            if [ -z "$AWS_ROLE_ARN" ]; then
-              echo "ERROR: AWS_ROLE_ARN is not set"
-              exit 1
-            fi
             # Configure AWS CLI to use OIDC token
             aws configure set region $AWS_REGION
-            # Export the OIDC token for AWS CLI
             echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
             export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
             export AWS_ROLE_ARN=$AWS_ROLE_ARN
