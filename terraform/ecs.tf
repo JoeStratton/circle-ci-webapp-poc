@@ -178,10 +178,6 @@ resource "aws_ecs_service" "app" {
   desired_count   = 1 # Single instance for cost optimization
   launch_type     = var.enable_fargate_spot ? null : "FARGATE"
 
-  # Ignore task_definition changes since CircleCI manages deployments
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
 
   # Use Fargate Spot for additional cost savings when enabled
   dynamic "capacity_provider_strategy" {
