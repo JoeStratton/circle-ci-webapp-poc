@@ -172,8 +172,20 @@ jobs:
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
             
+            # Debug: Check container status
+            echo "Container status:"
+            docker ps -a
+            echo "Container logs:"
+            docker logs test-app
+            echo "Container processes:"
+            docker exec test-app ps aux || echo "Cannot exec into container"
+            
             # Wait for app to start and run health checks
             sleep 30
+            echo "Checking container status again:"
+            docker ps -a
+            echo "Container logs before health check:"
+            docker logs test-app --tail 20
             curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/health
             curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/api/health
       - run:
