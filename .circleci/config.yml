@@ -17,11 +17,6 @@ executors:
     docker:
       - image: cimg/base:stable
     working_directory: ~/project
-    
-  terraform-docker-executor:
-    docker:
-      - image: hashicorp/terraform:1.13.1
-    working_directory: ~/project
 
   terraform-executor:
     docker:
@@ -210,10 +205,15 @@ commands:
             # Login to ECR
             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
             
-            # Push images
+            # Check if image already exists in ECR
             ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
-            docker push $ECR_URI:${CIRCLE_SHA1}
-            docker push $ECR_URI:latest
+            if aws ecr describe-images --repository-name circle-ci-webapp-poc-app --image-ids imageTag=${CIRCLE_SHA1} >/dev/null 2>&1; then
+              echo "Image ${CIRCLE_SHA1} already exists in ECR. Skipping push."
+            else
+              echo "Pushing new image ${CIRCLE_SHA1} to ECR"
+              docker push $ECR_URI:${CIRCLE_SHA1}
+              docker push $ECR_URI:latest
+            fi
             
             echo "✅ Images pushed to ECR successfully"
       - run:
@@ -407,12 +407,12 @@ jobs:
       - push-to-ecr-with-auth
 
   terraform-plan:
-    executor: terraform-docker-executor
+    executor: terraform-executor
     steps:
       - terraform-plan-with-auth
 
   terraform-apply:
-    executor: terraform-docker-executor
+    executor: terraform-executor
     steps:
       - terraform-apply-with-auth
 
