@@ -134,6 +134,11 @@ export FLASK_ENV=testing
 python -m pytest tests/test_container.py -v \
     --junit-xml=../test-results/container-validation.xml \
     --tb=short \
+    --cov=. \
+    --cov-report=xml:../coverage/container-coverage.xml \
+    --cov-report=html:../coverage/container-html \
+    --cov-report=term-missing \
+    --cov-fail-under=20 \
     -m "container"
 
 if [ $? -eq 0 ]; then
