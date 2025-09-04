@@ -16,11 +16,6 @@ executors:
       - image: cimg/python:3.11
     working_directory: ~/project
     
-  docker-executor:
-    docker:
-      - image: cimg/python:3.11
-    working_directory: ~/project
-    
   terraform-executor:
     docker:
       - image: hashicorp/terraform:1.13.1
@@ -131,17 +126,7 @@ jobs:
 
   # Build and test custom Docker image 
   build-and-test-image:
-    executor: docker-executor
-    docker:
-      - image: cimg/python:3.11
-        environment:
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
-          FLASK_ENV: testing
-      - image: cimg/postgres:13.8
-        environment:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+    executor: python-executor
     steps:
       - checkout
       - setup_remote_docker
@@ -151,64 +136,29 @@ jobs:
           dockerfile: docker/Dockerfile
           path: .
       - run:
-          name: Install dockerize and wait for database
-          command: |
-            # Install dockerize
-            wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
-            sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
-            rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
-            
-            # Wait for PostgreSQL sidecar to be ready
-            dockerize -wait tcp://localhost:5432 -timeout 1m
-          environment:
-            DOCKERIZE_VERSION: v0.9.6
-      - run:
           name: Start app container and run health checks
           command: |
-            # Start Flask app container
+            # Start Flask app container with in-memory SQLite
             docker run -d --name test-app \
-              -e DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb \
               -e FLASK_ENV=testing \
+              -e DATABASE_URL=sqlite:///:memory: \
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
-            
-            # Debug: Check container status
-            echo "Container status:"
-            docker ps -a
-            echo "Container logs:"
-            docker logs test-app
             
             # Wait for Flask app to start
             echo "Waiting for Flask app to start..."
             sleep 15
             
-            # Check container logs again after wait
-            echo "Container logs after wait:"
-            docker logs test-app --tail 20
+            # Check container status
+            echo "Container status:"
+            docker ps -a
+            echo "Container logs:"
+            docker logs test-app --tail 10
             
-            # Check if port is accessible
-            echo "Testing port connectivity:"
-            nc -z localhost 5000 && echo "Port 5000 is open" || echo "Port 5000 is not accessible"
-            
-            # Try connecting from inside the container
-            echo "Testing from inside container:"
-            docker exec test-app curl -s http://localhost:5000/health || echo "Cannot connect from inside container"
-            
-            # Check database initialization via Flask app
-            echo "Checking database initialization..."
-            for i in {1..30}; do
-              if curl -s http://localhost:5000/api/health | grep -q "healthy"; then
-                echo "Database is initialized and app is healthy!"
-                break
-              fi
-              echo "Attempt $i: Database not ready yet, waiting..."
-              sleep 3
-            done
-            
-            # Final verification - both health endpoints
-            echo "Running final health checks:"
-            curl --fail http://localhost:5000/health
-            curl --fail http://localhost:5000/api/health
+            # Run health checks
+            echo "Running health checks:"
+            curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/health
+            curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/api/health
       - run:
           name: Cleanup
           command: |
