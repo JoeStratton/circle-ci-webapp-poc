@@ -75,23 +75,4 @@ resource "aws_iam_role" "ecs_task_role" {
 }
 
 # Custom policy for ECS task (application-level permissions)
-resource "aws_iam_role_policy" "ecs_task_policy" {
-  name = "${var.project_name}-ecs-task-policy"
-  role = aws_iam_role.ecs_task_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject"
-        ]
-        Resource = [
-          "${aws_s3_bucket.artifacts.arn}/*"
-        ]
-      }
-    ]
-  })
-}
+# Note: S3 artifact bucket policy removed as artifacts are no longer used

@@ -20,7 +20,6 @@ ecs_memory = 512  # Minimum for cost optimization
 
 # Retention Policies (minimal cost)
 ecr_image_retention_count      = 3   # Keep last 3 images
-s3_artifact_retention_days     = 7   # Delete artifacts after 7 days
 cloudwatch_log_retention_days  = 1   # 1 day log retention
 
 # Database Configuration
