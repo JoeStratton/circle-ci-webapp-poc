@@ -177,7 +177,7 @@ jobs:
   container-tests:
     executor: python-executor
     steps:
-      - checkout
+      - setup-dependencies
       - attach_workspace:
           at: .
       - setup_remote_docker
