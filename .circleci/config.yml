@@ -132,6 +132,16 @@ jobs:
   # Build and test custom Docker image 
   build-and-test-image:
     executor: docker-executor
+    docker:
+      - image: cimg/base:stable
+        environment:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+          FLASK_ENV: testing
+      - image: cimg/postgres:13.8
+        environment:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
     steps:
       - checkout
       - setup_remote_docker
@@ -141,10 +151,19 @@ jobs:
           dockerfile: docker/Dockerfile
           path: .
       - run:
+          name: Wait for database
+          command: |
+            wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+            sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+            rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+            dockerize -wait tcp://localhost:5432 -timeout 1m
+          environment:
+            DOCKERIZE_VERSION: v0.6.1
+      - run:
           name: Start container for tests
           command: |
             docker run -d --name test-app \
-              -e DATABASE_URL=sqlite:///test.db \
+              -e DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb \
               -e FLASK_ENV=testing \
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
