@@ -250,11 +250,20 @@ commands:
             ECS_SERVICE="circle-ci-webapp-poc-service"
             TASK_FAMILY="circle-ci-webapp-poc-task"
             
+            # Get current task definition and check if image needs updating
             TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY --query taskDefinition)
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$ECR_URI:$CIRCLE_SHA1" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
-            aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
-            aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+            CURRENT_IMAGE=$(echo $TASK_DEF | jq -r '.containerDefinitions[0].image')
+            NEW_IMAGE="$ECR_URI:$CIRCLE_SHA1"
+            
+            if [ "$CURRENT_IMAGE" = "$NEW_IMAGE" ]; then
+              echo "Image $NEW_IMAGE is already deployed. Skipping ECS update."
+            else
+              echo "Updating from $CURRENT_IMAGE to $NEW_IMAGE"
+              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$NEW_IMAGE" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
+              aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
+              aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+            fi
       - run:
           name: Update deploy status
           command: |
