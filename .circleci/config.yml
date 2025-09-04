@@ -141,25 +141,27 @@ jobs:
           dockerfile: docker/Dockerfile
           path: .
       - run:
-          name: Install dockerize and start PostgreSQL
+          name: Install dockerize
           command: |
             # Install dockerize
             wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
             sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
             rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
-            
-            # Start PostgreSQL container
+          environment:
+            DOCKERIZE_VERSION: v0.9.6
+      - run:
+          name: Start PostgreSQL container
+          command: |
             docker run -d --name test-postgres \
               -e POSTGRES_USER=testuser \
               -e POSTGRES_PASSWORD=testpass \
               -e POSTGRES_DB=testdb \
               -p 5432:5432 \
               cimg/postgres:13.8
-            
-            # Wait for PostgreSQL to be ready
+      - run:
+          name: Wait for PostgreSQL to be ready
+          command: |
             dockerize -wait tcp://localhost:5432 -timeout 1m
-          environment:
-            DOCKERIZE_VERSION: v0.6.1
       - run:
           name: Start app container and run health checks
           command: |
