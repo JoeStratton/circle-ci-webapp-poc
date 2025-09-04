@@ -119,6 +119,10 @@ commands:
       - run:
           name: Terraform plan
           command: |
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
             cd terraform
             terraform init
             terraform plan \
@@ -131,6 +135,10 @@ commands:
       - run:
           name: Generate human-readable plan output
           command: |
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
             cd terraform
             terraform show -no-color tfplan > plan-output.txt
       - store_artifacts:
@@ -148,6 +156,10 @@ commands:
       - run:
           name: Terraform apply
           command: |
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
             cd terraform
             terraform init
             terraform apply -auto-approve tfplan
@@ -225,6 +237,10 @@ commands:
       - run:
           name: Update ECS service with new image
           command: |
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
             # Get ECR repository URL
             ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
             ECS_CLUSTER="circle-ci-webapp-poc-cluster"
