@@ -236,6 +236,10 @@ jobs:
       - terraform/plan:
           path: terraform
           out: tfplan
+          var: |
+            circleci_organization_id=$CIRCLECI_ORGANIZATION_ID,
+            circleci_project_id=$CIRCLECI_PROJECT_ID,
+            database_password=$DATABASE_PASSWORD
       - persist_to_workspace:
           root: .
           paths:
@@ -258,6 +262,10 @@ jobs:
       - terraform/apply:
           path: terraform
           plan: tfplan
+          var: |
+            circleci_organization_id=$CIRCLECI_ORGANIZATION_ID,
+            circleci_project_id=$CIRCLECI_PROJECT_ID,
+            database_password=$DATABASE_PASSWORD
 
   # CircleCI releases
   release-plan:
