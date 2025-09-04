@@ -132,16 +132,6 @@ jobs:
   # Build and test custom Docker image 
   build-and-test-image:
     executor: docker-executor
-    docker:
-      - image: cimg/base:stable
-        environment:
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
-          FLASK_ENV: testing
-      - image: cimg/postgres:13.8
-        environment:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
     steps:
       - checkout
       - setup_remote_docker
@@ -151,25 +141,37 @@ jobs:
           dockerfile: docker/Dockerfile
           path: .
       - run:
-          name: Wait for database
+          name: Install dockerize and start PostgreSQL
           command: |
+            # Install dockerize
             wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
             sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
             rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+            
+            # Start PostgreSQL container
+            docker run -d --name test-postgres \
+              -e POSTGRES_USER=testuser \
+              -e POSTGRES_PASSWORD=testpass \
+              -e POSTGRES_DB=testdb \
+              -p 5432:5432 \
+              cimg/postgres:13.8
+            
+            # Wait for PostgreSQL to be ready
             dockerize -wait tcp://localhost:5432 -timeout 1m
           environment:
             DOCKERIZE_VERSION: v0.6.1
       - run:
-          name: Start container for tests
+          name: Start app container and run health checks
           command: |
+            # Start Flask app container
             docker run -d --name test-app \
-              -e DATABASE_URL=postgresql://testuser:testpass@localhost:5432/testdb \
+              --link test-postgres:postgres \
+              -e DATABASE_URL=postgresql://testuser:testpass@postgres:5432/testdb \
               -e FLASK_ENV=testing \
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
-      - run:
-          name: Health checks
-          command: |
+            
+            # Wait for app to start and run health checks
             sleep 30
             curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/health
             curl --fail --retry 10 --retry-connrefused --retry-delay 3 http://localhost:5000/api/health
@@ -177,6 +179,7 @@ jobs:
           name: Cleanup
           command: |
             docker stop test-app && docker rm test-app
+            docker stop test-postgres && docker rm test-postgres
       - run:
           name: Save Docker image for workspace
           command: |
