@@ -135,10 +135,7 @@ commands:
               -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
               -var="database_username=$DB_USERNAME" \
               -var="database_password=$DB_PASSWORD" \
-              -out=tfplan \
-              -detailed-exitcode
-          # Exit code 2 means changes needed, which is success for plan
-          exit_code: [0, 2]
+              -out=tfplan
       - run:
           name: Generate human-readable plan output
           command: |
