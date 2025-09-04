@@ -181,7 +181,15 @@ jobs:
       - store_test_results:
           path: test-results
 
-  # Terraform validate with local init (no AWS creds needed)
+  # Terraform fmt
+  tf-fmt-oidc:
+    executor: python-executor
+    steps:
+      - checkout
+      - terraform/fmt:
+          path: terraform
+
+  # Terraform validate with OIDC
   tf-validate-oidc:
     executor: python-executor
     steps:
@@ -244,12 +252,11 @@ workflows:
       - lint-and-format
       - unit-tests
       - integration-tests
-      - terraform/fmt:
-          checkout: true
-          path: terraform
+      - tf-fmt-oidc
       - tf-validate-oidc:
+          context: aws-production
           requires:
-            - terraform/fmt
+            - tf-fmt-oidc
   
       # Phase 2: Build and Test Docker Image (runs on all branches)
       - build-and-test-image
@@ -287,13 +294,7 @@ workflows:
           context: aws-production
           requires:
             - aws-ecr/build_and_push_image
-          filters:
-            branches:
-              only: main
-
-      - release-plan:
-          requires:
-            - tf-plan-oidc
+            - tf-validate-oidc
           filters:
             branches:
               only: main
@@ -303,6 +304,13 @@ workflows:
           requires:
             - aws-ecr/build_and_push_image
             - tf-plan-oidc
+          filters:
+            branches:
+              only: main
+
+      - release-plan:
+          requires:
+            - hold-apply
           filters:
             branches:
               only: main
@@ -329,6 +337,10 @@ workflows:
           container_image_name_updates: container=circle-ci-webapp-poc-app,tag=${CIRCLE_SHA1}
           family: circle-ci-webapp-poc-task
           region: ${AWS_REGION}
+
       - release-update:
           requires:
             - aws-ecs/deploy_service_update
+          filters:
+            branches:
+              only: main
