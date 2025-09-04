@@ -18,11 +18,6 @@ executors:
       - image: cimg/base:stable
     working_directory: ~/project
 
-  terraform-executor:
-    docker:
-      - image: hashicorp/terraform:1.13.1
-    working_directory: ~/project
-
 # Commands for reusable logic
 commands:
   setup-dependencies:
@@ -75,6 +70,177 @@ commands:
       - store_artifacts:
           path: security-report.json
           destination: security-report.json
+
+  configure-oidc-auth:
+    description: "Configure AWS CLI with OIDC authentication"
+    steps:
+      - aws-cli/setup:
+          region: $AWS_REGION
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            aws configure set region $AWS_REGION
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+
+  terraform-format-check:
+    description: "Check Terraform formatting"
+    steps:
+      - checkout
+      - run:
+          name: Terraform format check
+          command: |
+            cd terraform
+            terraform fmt -check -recursive
+
+  terraform-validate-config:
+    description: "Validate Terraform configuration"
+    steps:
+      - checkout
+      - run:
+          name: Terraform validate
+          command: |
+            cd terraform
+            terraform init
+            terraform validate
+
+  terraform-plan-with-auth:
+    description: "Run Terraform plan with OIDC authentication and store artifacts"
+    steps:
+      - checkout
+      - configure-oidc-auth
+      - run:
+          name: Terraform plan
+          command: |
+            cd terraform
+            terraform init
+            terraform plan \
+              -var="circleci_organization_id=$CIRCLECI_ORGANIZATION_ID" \
+              -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
+              -var="database_username=$DB_USERNAME" \
+              -var="database_password=$DB_PASSWORD" \
+              -out=tfplan \
+              -detailed-exitcode
+      - run:
+          name: Generate human-readable plan output
+          command: |
+            cd terraform
+            terraform show -no-color tfplan > plan-output.txt
+      - store_artifacts:
+          path: terraform/tfplan
+          destination: terraform-plan
+      - store_artifacts:
+          path: terraform/plan-output.txt
+          destination: terraform-plan-output
+
+  terraform-apply-with-auth:
+    description: "Run Terraform apply with OIDC authentication and release updates"
+    steps:
+      - checkout
+      - configure-oidc-auth
+      - run:
+          name: Terraform apply
+          command: |
+            cd terraform
+            terraform init
+            terraform apply -auto-approve tfplan
+      - run:
+          name: Update deploy to SUCCESS
+          command: circleci run release update --status=SUCCESS
+          when: on_success
+      - run:
+          name: Update deploy to FAILED
+          command: circleci run release update --status=FAILED
+          when: on_fail
+
+  push-to-ecr-with-auth:
+    description: "Push Docker image to ECR with OIDC authentication"
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup_remote_docker
+      - configure-oidc-auth
+      - run:
+          name: Load and tag Docker image
+          command: |
+            docker load -i docker-image.tar
+            
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
+            # Get ECR repository URL
+            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
+            
+            # Tag image for ECR
+            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:${CIRCLE_SHA1}
+            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:latest
+      - run:
+          name: Login to ECR and push image
+          command: |
+            # Configure AWS CLI with OIDC token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
+            
+            # Login to ECR
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
+            
+            # Push images
+            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
+            docker push $ECR_URI:${CIRCLE_SHA1}
+            docker push $ECR_URI:latest
+            
+            echo "✅ Images pushed to ECR successfully"
+      - run:
+          name: Create deployment artifact
+          command: |
+            mkdir -p artifacts
+            cat > artifacts/deployment-info.json \<< EOF
+            {
+              "commit_sha": "${CIRCLE_SHA1}",
+              "branch": "${CIRCLE_BRANCH}",
+              "build_num": "${CIRCLE_BUILD_NUM}",
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "image_tag": "${CIRCLE_SHA1}",
+              "environment": "production"
+            }
+            EOF
+      - store_artifacts:
+          path: artifacts
+          destination: deployment-artifacts
+
+  deploy-to-ecs-with-auth:
+    description: "Deploy to ECS with OIDC authentication"
+    steps:
+      - checkout
+      - configure-oidc-auth
+      - run:
+          name: Update ECS service with new image
+          command: |
+            # Get ECR repository URL
+            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
+            ECS_CLUSTER="circle-ci-webapp-poc-cluster"
+            ECS_SERVICE="circle-ci-webapp-poc-app-service"
+            TASK_FAMILY="circle-ci-webapp-poc-app-service"
+            
+            # Get current task definition
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY --query taskDefinition)
+            
+            # Update image URI in task definition
+            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$ECR_URI:$CIRCLE_SHA1" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+            
+            # Register new task definition
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
+            
+            # Update ECS service
+            aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
+            
+            # Wait for deployment to complete
+            aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+            
+            echo "✅ ECS service updated successfully"
 
 # Job definitions
 jobs:
@@ -192,251 +358,103 @@ jobs:
       - store_test_results:
           path: test-results
 
-  # Push Docker image to ECR (main branch only)
+  # Terraform validation jobs
+  terraform-fmt:
+    executor: python-executor
+    steps:
+      - terraform-format-check
+
+  terraform-validate:
+    executor: python-executor
+    steps:
+      - terraform-validate-config
+
+  # Production deployment jobs
   push-to-ecr:
     executor: docker-executor
     steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - setup_remote_docker
-      - aws-cli/setup:
-          region: $AWS_REGION
-      - run:
-          name: Configure OIDC Authentication
-          command: |
-            # Configure AWS CLI to use OIDC token
-            aws configure set region $AWS_REGION
-            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-      - run:
-          name: Load and tag Docker image
-          command: |
-            docker load -i docker-image.tar
-            
-            # Configure AWS CLI with OIDC token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            # Get ECR repository URL
-            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
-            
-            # Tag image for ECR
-            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:${CIRCLE_SHA1}
-            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:latest
-      - run:
-          name: Login to ECR and push image
-          command: |
-            # Configure AWS CLI with OIDC token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            # Login to ECR
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
-            
-            # Push images
-            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
-            docker push $ECR_URI:${CIRCLE_SHA1}
-            docker push $ECR_URI:latest
-            
-            echo "✅ Images pushed to ECR successfully"
-      - run:
-          name: Create deployment artifact
-          command: |
-            mkdir -p artifacts
-            cat > artifacts/deployment-info.json \<< EOF
-            {
-              "commit_sha": "${CIRCLE_SHA1}",
-              "branch": "${CIRCLE_BRANCH}",
-              "build_num": "${CIRCLE_BUILD_NUM}",
-              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-              "image_tag": "${CIRCLE_SHA1}",
-              "environment": "production"
-            }
-            EOF
-      - store_artifacts:
-          path: artifacts
-          destination: deployment-artifacts
+      - push-to-ecr-with-auth
 
-  # Terraform plan job
   terraform-plan:
-    executor: terraform-executor
+    executor: python-executor
     steps:
-      - checkout
-      - aws-cli/setup:
-          region: $AWS_REGION
-      - run:
-          name: Plan a deploy
-          command: circleci run release plan --target-version=${CIRCLE_SHA1}
-      - run:
-          name: Configure OIDC Authentication
-          command: |
-            # Configure AWS CLI to use OIDC token
-            aws configure set region $AWS_REGION
-            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-      - run:
-          name: Terraform format and validate
-          command: |
-            cd terraform
-            terraform fmt -check -recursive
-            terraform init
-            terraform validate
-      - run:
-          name: Terraform plan (combined infrastructure)
-          command: |
-            cd terraform
-            terraform plan \
-              -var="circleci_organization_id=$CIRCLECI_ORGANIZATION_ID" \
-              -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
-              -var="database_username=$DB_USERNAME" \
-              -var="database_password=$DB_PASSWORD" \
-              -out=tfplan \
-              -detailed-exitcode
-      - run:
-          name: Generate human-readable plan output
-          command: |
-            cd terraform
-            terraform show -no-color tfplan > plan-output.txt
-      - store_artifacts:
-          path: terraform/tfplan
-          destination: terraform-plan
-      - store_artifacts:
-          path: terraform/plan-output.txt
-          destination: terraform-plan-output
+      - terraform-plan-with-auth
 
-  # Deploy complete infrastructure with Terraform (simplified single-layer)
-  deploy-with-terraform:
-    executor: terraform-executor
+  terraform-apply:
+    executor: python-executor
     steps:
-      - checkout
-      - aws-cli/setup:
-          region: $AWS_REGION
-      - run:
-          name: Configure OIDC Authentication
-          command: |
-            # Configure AWS CLI to use OIDC token
-            aws configure set region $AWS_REGION
-            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-      - run:
-          name: Terraform apply (cost-optimized infrastructure)
-          command: |
-            cd terraform
-            terraform init
-            terraform apply -auto-approve tfplan
-            
-            # Get outputs for ECS deployment
-            ECR_URI=$(terraform output -raw ecr_repository_url)
-            ECS_CLUSTER=$(terraform output -raw ecs_cluster_name)
-            ECS_SERVICE=$(terraform output -raw ecs_service_name)
-            TASK_FAMILY=$(terraform output -raw task_definition_family)
-            
-            echo "Infrastructure deployed successfully"
-            echo "ECR URI: $ECR_URI"
-            echo "ECS Cluster: $ECS_CLUSTER"
-            echo "ECS Service: $ECS_SERVICE"
-      - run:
-          name: Update ECS service with new image
-          command: |
-            cd terraform
-            ECR_URI=$(terraform output -raw ecr_repository_url)
-            ECS_CLUSTER=$(terraform output -raw ecs_cluster_name)
-            ECS_SERVICE=$(terraform output -raw ecs_service_name)
-            TASK_FAMILY=$(terraform output -raw task_definition_family)
-            
-            # Get current task definition
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY --query taskDefinition)
-            
-            # Update image URI in task definition
-            NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$ECR_URI:$CIRCLE_SHA1" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-            
-            # Register new task definition
-            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
-            
-            # Update ECS service
-            aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
-            
-            # Wait for deployment to complete
-            aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
-            
-            echo "✅ ECS service updated successfully"
-      - run:
-          name: Update a deploy to SUCCESS
-          command: circleci run release update --status=SUCCESS
-          when: on_success
-      - run:
-          name: Update planned deploy to FAILED
-          command: circleci run release update --status=FAILED
-          when: on_fail
+      - terraform-apply-with-auth
+
+  deploy-to-ecs:
+    executor: python-executor
+    steps:
+      - deploy-to-ecs-with-auth
 
 # Workflows define job orchestration with branch-based conditions
 workflows:
   version: 2
   build-test-deploy:
     jobs:
-      # Code quality - runs on all branches
+      # Phase 1: Code Quality and Testing (runs on all branches in parallel)
       - lint-and-format
-      
-      # Unit tests - runs on all branches
       - unit-tests
-      
-      # Integration tests with PostgreSQL sidecar - runs on all branches
       - integration-tests
-      
-      # Build and test Docker image - runs on all branches
+      - terraform-fmt
+      - terraform-validate
+  
+      # Phase 2: Build and Test Docker Image (runs on all branches)
       - build-and-test-image
       
-      # Container tests with dgoss - runs on all branches
-
+      # Phase 3: Container Testing (runs on all branches, requires previous phases)
       - container-tests:
           requires:
             - lint-and-format
             - unit-tests
             - integration-tests
             - build-and-test-image
-     
-      # Push to ECR - MAIN BRANCH ONLY
+      
+      # Phase 5: Production Deployment (MAIN BRANCH ONLY)
       - push-to-ecr:
+          context: aws-production
           requires:
             - container-tests
+            - terraform-fmt
+            - terraform-validate
           filters:
             branches:
               only: main
-          context:
-            - aws-production
       
-      # Terraform plan - MAIN BRANCH ONLY
       - terraform-plan:
+          context: aws-production
           requires:
-            - push-to-ecr
+            - container-tests
+            - terraform-fmt
+            - terraform-validate
           filters:
             branches:
               only: main
-          context:
-            - aws-production
       
-      # Terraform approval - MAIN BRANCH ONLY
-      - manual-approval:
+      - hold-apply:
           type: approval
           requires:
+            - push-to-ecr
             - terraform-plan
           filters:
             branches:
               only: main
       
-      # Deploy with Terraform - MAIN BRANCH ONLY
-      - deploy-with-terraform:
+      - terraform-apply:
+          context: aws-production
           requires:
-            - manual-approval
+            - hold-apply
           filters:
             branches:
               only: main
-          context:
-            - aws-production
-
-
-
+      
+      - deploy-to-ecs:
+          context: aws-production
+          requires:
+            - terraform-apply
+          filters:
+            branches:
+              only: main
