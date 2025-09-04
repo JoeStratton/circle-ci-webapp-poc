@@ -42,7 +42,7 @@ cd app
 # pytest: Python testing framework with excellent JUnit XML support
 # Features: Fixtures, markers, coverage integration, CircleCI native reporting
 print_status "Running unit tests with pytest framework and SQLite in-memory database..."
-python -m pytest tests/test_app.py -v \
+python -m pytest tests/ -v \
     --junit-xml=../test-results/unit-tests.xml \
     --cov=app \
     --cov-report=xml:../coverage/unit-coverage.xml \
