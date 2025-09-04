@@ -21,6 +21,11 @@ executors:
       - image: cimg/base:stable
     working_directory: ~/project
     
+  terraform-executor:
+    docker:
+      - image: hashicorp/terraform:1.13.1
+    working_directory: ~/project
+    
 # Commands for reusable logic
 commands:
   setup-dependencies:
@@ -183,7 +188,7 @@ jobs:
 
   # Terraform fmt
   tf-fmt-oidc:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - checkout
       - terraform/fmt:
@@ -191,7 +196,7 @@ jobs:
 
   # Terraform validate with OIDC
   tf-validate-oidc:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - checkout
       - aws-cli/setup:
@@ -204,7 +209,7 @@ jobs:
 
   # Terraform OIDC-wrapped jobs
   tf-plan-oidc:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - checkout
       - aws-cli/setup:
@@ -221,7 +226,7 @@ jobs:
             - terraform/tfplan
 
   tf-apply-oidc:
-    executor: python-executor
+    executor: terraform-executor
     steps:
       - aws-cli/setup:
           region: $AWS_REGION
