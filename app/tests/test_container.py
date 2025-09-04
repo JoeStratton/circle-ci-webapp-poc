@@ -128,7 +128,8 @@ class TestDatabaseSidecar:
     
     def test_database_initialization(self):
         """Test database initialization process"""
-        from app import db, User, HealthCheck
+        from app import db
+        from models import User, HealthCheck
         from app import app
         
         with app.app_context():
