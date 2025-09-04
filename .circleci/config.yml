@@ -310,6 +310,7 @@ workflows:
           region: ${AWS_REGION}
           repo: circle-ci-webapp-poc-app
           tag: ${CIRCLE_SHA1},latest
+          skip_when_tags_exist: true
       
       - tf-plan-oidc:
           context: aws-production
