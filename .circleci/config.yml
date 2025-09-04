@@ -3,7 +3,7 @@ version: 2.1
 # Orbs for enhanced functionality
 orbs:
   aws-cli: circleci/aws-cli@5.4.1
-  docker: circleci/docker@3.0.0
+  docker: circleci/docker@2.8.2
   python: circleci/python@3.2.0
 
 # Executors define the execution environment
@@ -58,12 +58,6 @@ commands:
             ./scripts/test-integration.sh
       - store_test_results:
           path: test-results
-      - store_artifacts:
-          path: test-results
-          destination: test-results
-      - store_artifacts:
-          path: coverage
-          destination: coverage
 
   security-scan:
     description: "Run security scans and compliance checks"
@@ -108,12 +102,6 @@ jobs:
             ./scripts/test-unit.sh
       - store_test_results:
           path: test-results
-      - store_artifacts:
-          path: test-results
-          destination: unit-test-results
-      - store_artifacts:
-          path: coverage
-          destination: unit-coverage
 
   # Integration tests with PostgreSQL sidecar 
   integration-tests:
@@ -198,9 +186,8 @@ jobs:
           name: Run container tests with dedicated script
           command: |
             ./scripts/test-container.sh
-      - store_artifacts:
+      - store_test_results:
           path: test-results
-          destination: container-test-results
 
   # Push Docker image to ECR (main branch only)
   push-to-ecr:

@@ -59,7 +59,7 @@ cd app
 # JUnit XML: Native CircleCI integration for test result parsing
 print_status "Running integration tests with pytest framework and PostgreSQL sidecar..."
 python -m pytest tests/ -v \
-    --junit-xml=../test-results/integration-tests.xml \
+    --junit-xml=../test-results/junit.xml \
     --cov=app \
     --cov-report=xml:../coverage/integration-coverage.xml \
     --cov-report=html:../coverage/integration-html \
