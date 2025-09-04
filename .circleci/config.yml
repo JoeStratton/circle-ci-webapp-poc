@@ -2,9 +2,9 @@ version: 2.1
 
 # Orbs for enhanced functionality
 orbs:
-  aws-cli: circleci/aws-cli@4.0
-  docker: circleci/docker@2.2
-  python: circleci/python@2.1
+  aws-cli: circleci/aws-cli@5.4.1
+  docker: circleci/docker@3.0.0
+  python: circleci/python@3.2.0
 
 # Executors define the execution environment
 executors:
@@ -212,8 +212,16 @@ jobs:
       - setup_remote_docker:
           version: 20.10.14
       - aws-cli/setup:
-          role-arn: $AWS_ROLE_ARN  # OIDC role for secure authentication
           region: $AWS_REGION
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            # Configure AWS CLI to use OIDC token
+            aws configure set region $AWS_REGION
+            # Export the OIDC token for AWS CLI
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
       - run:
           name: Load and tag Docker image
           command: |
@@ -261,8 +269,16 @@ jobs:
     steps:
       - checkout
       - aws-cli/setup:
-          role-arn: $AWS_ROLE_ARN  # OIDC role for secure authentication
           region: $AWS_REGION
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            # Configure AWS CLI to use OIDC token
+            aws configure set region $AWS_REGION
+            # Export the OIDC token for AWS CLI
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
       - run:
           name: Terraform format and validate
           command: |
