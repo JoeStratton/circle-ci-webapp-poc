@@ -48,10 +48,10 @@ resource "aws_iam_role" "circleci_oidc_role" {
   })
 }
 
-# IAM Policy for CircleCI - ECS and ECR permissions
+# IAM Policy for CircleCI - ECS, ECR, and S3 permissions
 resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
   name        = "${var.project_name}-circleci-ecs-ecr-policy"
-  description = "Policy for CircleCI to manage ECS and ECR resources"
+  description = "Policy for CircleCI to manage ECS, ECR, and S3 resources"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -95,6 +95,20 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "iam:PassRole"
         ]
         Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-ecs-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # S3 permissions for Terraform state management
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.state_bucket}",
+          "arn:aws:s3:::${var.state_bucket}/*"
+        ]
       }
     ]
   })
