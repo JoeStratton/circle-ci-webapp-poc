@@ -3,8 +3,11 @@ version: 2.1
 # Orbs for enhanced functionality
 orbs:
   aws-cli: circleci/aws-cli@5.4.1
+  aws-ecr: circleci/aws-ecr@9.5.4
   docker: circleci/docker@3.0.0
   python: circleci/python@3.2.0
+  terraform: circleci/terraform@3.7
+  aws-ecs: circleci/aws-ecs@7.1.0
 
 # Executors define the execution environment
 executors:
@@ -17,12 +20,7 @@ executors:
     docker:
       - image: cimg/base:stable
     working_directory: ~/project
-
-  terraform-executor:
-    docker:
-      - image: hashicorp/terraform:1.13.1
-    working_directory: ~/project
-
+    
 # Commands for reusable logic
 commands:
   setup-dependencies:
@@ -75,203 +73,6 @@ commands:
       - store_artifacts:
           path: security-report.json
           destination: security-report.json
-
-  configure-oidc-auth:
-    description: "Configure AWS CLI with OIDC authentication"
-    steps:
-      - aws-cli/setup:
-          region: $AWS_REGION
-      - run:
-          name: Configure OIDC Authentication
-          command: |
-            aws configure set region $AWS_REGION
-            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-
-  terraform-format-check:
-    description: "Check Terraform formatting"
-    steps:
-      - checkout
-      - run:
-          name: Terraform format check
-          command: |
-            cd terraform
-            terraform fmt -check -recursive
-
-  terraform-validate-config:
-    description: "Validate Terraform configuration"
-    steps:
-      - checkout
-      - run:
-          name: Terraform validate
-          command: |
-            cd terraform
-            # Use local backend for validation to avoid AWS credential issues
-            terraform init -backend=false
-            terraform validate
-
-  terraform-plan-with-auth:
-    description: "Run Terraform plan with OIDC authentication and store artifacts"
-    steps:
-      - checkout
-      - configure-oidc-auth
-      - run:
-          name: Terraform plan
-          command: |
-            # Configure AWS CLI with OIDC token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            cd terraform
-            terraform init
-            terraform plan \
-              -var="circleci_organization_id=$CIRCLECI_ORGANIZATION_ID" \
-              -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
-              -var="database_username=$DB_USERNAME" \
-              -var="database_password=$DB_PASSWORD" \
-              -out=tfplan
-      - run:
-          name: Generate human-readable plan output
-          command: |
-            # Configure AWS CLI with OIDC token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            cd terraform
-            terraform show -no-color tfplan > plan-output.txt
-      - store_artifacts:
-          path: terraform/tfplan
-          destination: terraform-plan
-      - store_artifacts:
-          path: terraform/plan-output.txt
-          destination: terraform-plan-output
-      - persist_to_workspace:
-          root: .
-          paths:
-            - terraform/tfplan
-            - terraform/plan-output.txt
-
-  terraform-apply-with-auth:
-    description: "Run Terraform apply with OIDC authentication and release updates"
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - configure-oidc-auth
-      - run:
-          name: Start release plan
-          command: circleci run release plan terraform-deploy --environment-name=dev --component-name=infrastructure --target-version=${CIRCLE_SHA1}
-      - run:
-          name: Terraform apply
-          command: |
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            cd terraform
-            terraform init
-            terraform apply tfplan
-
-  push-to-ecr-with-auth:
-    description: "Push Docker image to ECR with OIDC authentication"
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - setup_remote_docker
-      - configure-oidc-auth
-      - run:
-          name: Load and tag Docker image
-          command: |
-            docker load -i docker-image.tar
-            
-            # Configure AWS CLI with OIDC token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            # Get ECR repository URL
-            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
-            
-            # Tag image for ECR
-            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:${CIRCLE_SHA1}
-            docker tag circleci-demo-app:${CIRCLE_SHA1} $ECR_URI:latest
-      - run:
-          name: Login to ECR and push image
-          command: |
-            # Configure AWS CLI with OIDC token
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            # Login to ECR
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
-            
-            # Check if image already exists in ECR
-            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
-            if aws ecr describe-images --repository-name circle-ci-webapp-poc-app --image-ids imageTag=${CIRCLE_SHA1} >/dev/null 2>&1; then
-              echo "Image ${CIRCLE_SHA1} already exists in ECR. Skipping push."
-            else
-              echo "Pushing new image ${CIRCLE_SHA1} to ECR"
-              docker push $ECR_URI:${CIRCLE_SHA1}
-              docker push $ECR_URI:latest
-            fi
-            
-            echo "✅ Images pushed to ECR successfully"
-      - run:
-          name: Create deployment artifact
-          command: |
-            mkdir -p artifacts
-            cat > artifacts/deployment-info.json \<< EOF
-            {
-              "commit_sha": "${CIRCLE_SHA1}",
-              "branch": "${CIRCLE_BRANCH}",
-              "build_num": "${CIRCLE_BUILD_NUM}",
-              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-              "image_tag": "${CIRCLE_SHA1}",
-              "environment": "production"
-            }
-            EOF
-      - store_artifacts:
-          path: artifacts
-          destination: deployment-artifacts
-
-  deploy-to-ecs-with-auth:
-    description: "Deploy to ECS with OIDC authentication"
-    steps:
-      - checkout
-      - configure-oidc-auth
-      - run:
-          name: Update ECS service with new image
-          command: |
-            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
-            export AWS_ROLE_ARN=$AWS_ROLE_ARN
-            
-            ECR_URI=$(aws ecr describe-repositories --repository-names circle-ci-webapp-poc-app --query 'repositories[0].repositoryUri' --output text)
-            ECS_CLUSTER="circle-ci-webapp-poc-cluster"
-            ECS_SERVICE="circle-ci-webapp-poc-service"
-            TASK_FAMILY="circle-ci-webapp-poc-task"
-            
-            # Get current task definition and check if image needs updating
-            TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY --query taskDefinition)
-            CURRENT_IMAGE=$(echo $TASK_DEF | jq -r '.containerDefinitions[0].image')
-            NEW_IMAGE="$ECR_URI:$CIRCLE_SHA1"
-            
-            if [ "$CURRENT_IMAGE" = "$NEW_IMAGE" ]; then
-              echo "Image $NEW_IMAGE is already deployed. Skipping ECS update."
-            else
-              echo "Updating from $CURRENT_IMAGE to $NEW_IMAGE"
-              NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE_URI "$NEW_IMAGE" '.containerDefinitions[0].image = $IMAGE_URI | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.placementConstraints) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
-              NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query taskDefinition.taskDefinitionArn --output text)
-              aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $NEW_TASK_DEF_ARN
-              aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
-            fi
-      - run:
-          name: Update deploy status
-          command: |
-            if [ $? -eq 0 ]; then
-              circleci run release update terraform-deploy --status=success || true
-            else
-              circleci run release update terraform-deploy --status=fail || true
-            fi
 
 # Job definitions
 jobs:
@@ -329,37 +130,28 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - docker/build:
+          image: circleci-demo-app
+          tag: ${CIRCLE_SHA1}
+          dockerfile: docker/Dockerfile
+          path: .
       - run:
-          name: Build custom Docker image
+          name: Start container for tests
           command: |
-            echo "Building custom Docker image for linux/amd64..."
-            docker build --platform linux/amd64 -f docker/Dockerfile -t circleci-demo-app:${CIRCLE_SHA1} .
-            docker tag circleci-demo-app:${CIRCLE_SHA1} circleci-demo-app:latest
-            echo "✅ Docker image built successfully"
-      - run:
-          name: Test Docker image with container health checks
-          command: |
-            echo "Testing Docker image functionality..."
-            
-            # Test image with SQLite (no external dependencies for basic test)
             docker run -d --name test-app \
               -e DATABASE_URL=sqlite:///test.db \
               -e FLASK_ENV=testing \
               -p 5000:5000 \
               circleci-demo-app:${CIRCLE_SHA1}
-            
-            # Wait for application startup
+      - run:
+          name: Health checks
+          command: |
             sleep 20
-            
-            # Test health endpoint
-            docker exec test-app curl -f http://localhost:5000/health || exit 1
-            
-            # Test API endpoint
-            docker exec test-app curl -f http://localhost:5000/api/health || exit 1
-            
-            echo "✅ Docker image tests passed"
-            
-            # Cleanup
+            curl -f http://localhost:5000/health
+            curl -f http://localhost:5000/api/health
+      - run:
+          name: Cleanup
+          command: |
             docker stop test-app && docker rm test-app
       - run:
           name: Save Docker image for workspace
@@ -389,37 +181,46 @@ jobs:
       - store_test_results:
           path: test-results
 
-  # Terraform validation jobs
-  terraform-fmt:
-    executor: terraform-executor
-    steps:
-      - terraform-format-check
-
-  terraform-validate:
-    executor: terraform-executor
-    steps:
-      - terraform-validate-config
-
-  # Production deployment jobs
-  push-to-ecr:
-    executor: docker-executor
-    steps:
-      - push-to-ecr-with-auth
-
-  terraform-plan:
-    executor: terraform-executor
-    steps:
-      - terraform-plan-with-auth
-
-  terraform-apply:
-    executor: terraform-executor
-    steps:
-      - terraform-apply-with-auth
-
-  deploy-to-ecs:
+  # Terraform OIDC-wrapped jobs
+  tf-plan-oidc:
     executor: python-executor
     steps:
-      - deploy-to-ecs-with-auth
+      - checkout
+      - aws-cli/setup:
+          region: $AWS_REGION
+          role_arn: $AWS_ROLE_ARN
+      - terraform/init:
+          path: terraform
+      - terraform/plan:
+          path: terraform
+          out: tfplan
+      - persist_to_workspace:
+          root: .
+          paths:
+            - terraform/tfplan
+
+  tf-apply-oidc:
+    executor: python-executor
+    steps:
+      - aws-cli/setup:
+          region: $AWS_REGION
+          role_arn: $AWS_ROLE_ARN
+      - attach_workspace:
+          at: .
+      - terraform/apply:
+          path: terraform
+          plan: tfplan
+
+  # CircleCI releases
+  release-plan:
+    executor: python-executor
+    steps:
+      - run: circleci run release plan terraform-deploy --environment-name=dev --component-name=infrastructure --target-version=${CIRCLE_SHA1}
+
+  release-update:
+    executor: python-executor
+    steps:
+      - run: circleci run release update terraform-deploy --status=success || circleci run release update terraform-deploy --status=fail
 
 # Workflows define job orchestration with branch-based conditions
 workflows:
@@ -430,8 +231,16 @@ workflows:
       - lint-and-format
       - unit-tests
       - integration-tests
-      - terraform-fmt
-      - terraform-validate
+      - terraform/fmt:
+          checkout: true
+          context: aws-production
+          path: terraform
+      - terraform/validate:
+          checkout: true
+          context: aws-production
+          path: terraform
+          requires:
+            - terraform/fmt
   
       # Phase 2: Build and Test Docker Image (runs on all branches)
       - build-and-test-image
@@ -445,22 +254,37 @@ workflows:
             - build-and-test-image
       
       # Phase 5: Production Deployment (MAIN BRANCH ONLY)
-      - push-to-ecr:
+      - aws-ecr/build_and_push_image:
           context: aws-production
           requires:
             - container-tests
-            - terraform-fmt
-            - terraform-validate
           filters:
             branches:
               only: main
+          account_id: ${AWS_ACCOUNT_ID}
+          auth:
+            - aws-cli/setup:
+                role_arn: ${AWS_ROLE_ARN}
+          create_repo: true
+          dockerfile: docker/Dockerfile
+          path: .
+          platform: linux/amd64
+          push_image: true
+          region: ${AWS_REGION}
+          repo: circle-ci-webapp-poc-app
+          tag: ${CIRCLE_SHA1},latest
       
-      - terraform-plan:
+      - tf-plan-oidc:
           context: aws-production
           requires:
-            - container-tests
-            - terraform-fmt
-            - terraform-validate
+            - aws-ecr/build_and_push_image
+          filters:
+            branches:
+              only: main
+
+      - release-plan:
+          requires:
+            - tf-plan-oidc
           filters:
             branches:
               only: main
@@ -468,13 +292,13 @@ workflows:
       - hold-apply:
           type: approval
           requires:
-            - push-to-ecr
-            - terraform-plan
+            - aws-ecr/build_and_push_image
+            - tf-plan-oidc
           filters:
             branches:
               only: main
       
-      - terraform-apply:
+      - tf-apply-oidc:
           context: aws-production
           requires:
             - hold-apply
@@ -482,10 +306,20 @@ workflows:
             branches:
               only: main
       
-      - deploy-to-ecs:
+      - aws-ecs/deploy_service_update:
           context: aws-production
           requires:
-            - terraform-apply
+            - tf-apply-oidc
           filters:
             branches:
               only: main
+          auth:
+            - aws-cli/setup:
+                role_arn: ${AWS_ROLE_ARN}
+          cluster: circle-ci-webapp-poc-cluster
+          container_image_name_updates: container=circle-ci-webapp-poc-app,tag=${CIRCLE_SHA1}
+          family: circle-ci-webapp-poc-task
+          region: ${AWS_REGION}
+      - release-update:
+          requires:
+            - aws-ecs/deploy_service_update
