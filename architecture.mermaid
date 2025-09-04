@@ -1,48 +1,50 @@
 graph TB    
     subgraph "CircleCI Pipeline POC"
         F[Lint & Format<br/>Code Quality] --> G[Unit Tests<br/>pytest + SQLite + JUnit XML]
-        G --> H[Integration Tests<br/>pytest + PostgreSQL Sidecar]
+        G --> H[Integration Tests<br/>pytest + PostgreSQL Sidecar + Security Scan]
         H --> I[Build & Test Image<br/>Multi-stage Docker + dgoss]
         I --> J[Container Tests<br/>dgoss + pytest validation]
         J --> K{Branch Check}
         K -->|main| N[Push to ECR<br/>OIDC Authentication]
         K -->|dev| M[Stop Here - No Deploy]
-        N --> O[Deploy with Terraform<br/>Infrastructure as Code]
+        N --> P[Terraform Plan<br/>Infrastructure Planning]
+        P --> Q[Manual Approval<br/>Review & Approve Changes]
+        Q --> R[Deploy with Terraform<br/>Infrastructure as Code]
     end
     
     subgraph "AWS Infrastructure"
-        P[ECR Repository<br/>3 Image Retention]
-        Q[ECS Fargate Spot<br/>Flask + PostgreSQL Sidecar]
-        R[CircleCI Contexts<br/>Encrypted Credentials]
-        S[S3 Artifacts<br/>7-day Lifecycle]
-        T[CloudWatch Logs<br/>1-day Retention]
+        S[ECR Repository<br/>3 Image Retention]
+        T[ECS Fargate Spot<br/>Flask + PostgreSQL Sidecar]
+        U[CircleCI Contexts<br/>Encrypted Credentials]
+        V[S3 Artifacts<br/>7-day Lifecycle]
+        W[CloudWatch Logs<br/>1-day Retention]
     end
     
     subgraph "Application Containers"
-        U[PostgreSQL Sidecar<br/>postgres:13 off-the-shelf]
-        V[Flask App Container<br/>Connects to localhost:5432]
-        W[Web Interface<br/>HTML5 + CSS3 + JavaScript]
+        X[PostgreSQL Sidecar<br/>postgres:13 off-the-shelf]
+        Y[Flask App Container<br/>Connects to localhost:5432]
+        Z[Web Interface<br/>HTML5 + CSS3 + JavaScript]
     end
     
     subgraph "Security & Access"
-        Z[OIDC Provider<br/>No Static Keys]
-        AA[IAM Role<br/>Least Privilege]
-        BB[Branch Restrictions<br/>Main Only Deploy]
+        AA[OIDC Provider<br/>No Static Keys]
+        BB[IAM Role<br/>Least Privilege]
+        CC[Branch Restrictions<br/>Main Only Deploy]
     end
     
     %% Connections
-    N --> P
-    O --> Q
-    Q --> U
-    Q --> V
-    V --> W
-    R --> U
+    N --> S
+    R --> T
+    T --> X
+    T --> Y
+    Y --> Z
+    U --> X
+    U --> Y
     R --> V
-    O --> S
-    Q --> T
-    Z --> O
-    AA --> O
-    BB --> N
+    T --> W
+    AA --> R
+    BB --> R
+    CC --> N
     
     %% Styling
     classDef pipeline fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
@@ -54,9 +56,9 @@ graph TB
     classDef web fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     
     class F,G,H,I,J pipeline
-    class P,Q,S,T aws
-    class U,V application
-    class W web
-    class Z,AA,BB security
+    class S,T,U,V,W aws
+    class X,Y application
+    class Z web
+    class AA,BB,CC security
     class K decision
-    class N,O deploy
+    class N,P,Q,R deploy

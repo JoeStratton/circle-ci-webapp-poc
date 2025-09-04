@@ -252,8 +252,8 @@ jobs:
           path: artifacts
           destination: deployment-artifacts
 
-  # Deploy complete infrastructure with Terraform (simplified single-layer)
-  deploy-with-terraform:
+  # Terraform plan job
+  terraform-plan:
     executor: terraform-executor
     steps:
       - checkout
@@ -287,11 +287,41 @@ jobs:
               -var="circleci_project_id=$CIRCLECI_PROJECT_ID" \
               -var="database_username=$DB_USERNAME" \
               -var="database_password=$DB_PASSWORD" \
-              -out=tfplan
+              -out=tfplan \
+              -detailed-exitcode
+      - run:
+          name: Generate human-readable plan output
+          command: |
+            cd terraform
+            terraform show -no-color tfplan > plan-output.txt
+      - store_artifacts:
+          path: terraform/tfplan
+          destination: terraform-plan
+      - store_artifacts:
+          path: terraform/plan-output.txt
+          destination: terraform-plan-output
+
+  # Deploy complete infrastructure with Terraform (simplified single-layer)
+  deploy-with-terraform:
+    executor: terraform-executor
+    steps:
+      - checkout
+      - aws-cli/setup:
+          region: $AWS_REGION
+      - run:
+          name: Configure OIDC Authentication
+          command: |
+            # Configure AWS CLI to use OIDC token
+            aws configure set region $AWS_REGION
+            # Export the OIDC token for AWS CLI
+            echo $CIRCLE_OIDC_TOKEN > /tmp/oidc_token
+            export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/oidc_token
+            export AWS_ROLE_ARN=$AWS_ROLE_ARN
       - run:
           name: Terraform apply (cost-optimized infrastructure)
           command: |
             cd terraform
+            terraform init
             terraform apply -auto-approve tfplan
             
             # Get outputs for ECS deployment
@@ -337,11 +367,6 @@ jobs:
           name: Update planned deploy to FAILED
           command: circleci run release update --status=FAILED
           when: on_fail
-      - store_artifacts:
-          path: terraform/tfplan
-          destination: terraform-plan
-
-
 
 # Workflows define job orchestration with branch-based conditions
 workflows:
@@ -398,10 +423,29 @@ workflows:
           context:
             - aws-production
       
+      # Terraform plan - MAIN BRANCH ONLY
+      - terraform-plan:
+          requires:
+            - push-to-ecr
+          filters:
+            branches:
+              only: main
+          context:
+            - aws-production
+      
+      # Terraform approval - MAIN BRANCH ONLY
+      - hold:
+          type: approval
+          requires:
+            - terraform-plan
+          filters:
+            branches:
+              only: main
+      
       # Deploy with Terraform - MAIN BRANCH ONLY
       - deploy-with-terraform:
           requires:
-            - push-to-ecr
+            - hold
           filters:
             branches:
               only: main

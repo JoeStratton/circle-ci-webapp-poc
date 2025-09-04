@@ -155,7 +155,7 @@ class TestContainerSecurity:
         # For now, we test the configuration
         
         # Check that our Dockerfile creates a non-root user
-        with open('Dockerfile', 'r') as f:
+        with open('../docker/Dockerfile', 'r') as f:
             dockerfile_content = f.read()
             assert 'appuser' in dockerfile_content
             assert 'USER appuser' in dockerfile_content
@@ -163,7 +163,7 @@ class TestContainerSecurity:
     def test_minimal_attack_surface(self):
         """Test that container has minimal attack surface"""
         # Check that .dockerignore excludes sensitive files
-        with open('.dockerignore', 'r') as f:
+        with open('../docker/.dockerignore', 'r') as f:
             dockerignore_content = f.read()
             sensitive_patterns = ['.git', '*.pyc', '.env', 'tests/']
             for pattern in sensitive_patterns:
