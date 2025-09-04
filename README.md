@@ -1,4 +1,4 @@
-# CircleCI Demo POC
+# CircleCI WebApp POC
 
 ** AWS Cost-optimized CI/CD pipeline demonstration **
 
