@@ -149,38 +149,15 @@ jobs:
             echo "Waiting for Flask app to start..."
             sleep 15
             
-            # Check container status
-            echo "Container status:"
-            docker ps -a
-            echo "Container logs:"
-            docker logs test-app --tail 10
-            
-            # Get container IP and test connectivity
+            # Test health endpoints using container IP
             CONTAINER_IP=$(docker inspect test-app --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-            echo "Container IP: $CONTAINER_IP"
+            echo "Testing health endpoints via container IP ($CONTAINER_IP):"
             
-            # Test connectivity to container IP
-            echo "Testing connectivity to container IP:"
-            curl -s http://$CONTAINER_IP:5000/health || echo "Failed to connect to container IP"
+            # Test both health endpoints
+            curl --fail http://$CONTAINER_IP:5000/health
+            curl --fail http://$CONTAINER_IP:5000/api/health
             
-            # Test localhost connectivity
-            echo "Testing localhost connectivity:"
-            curl -s http://localhost:5000/health || echo "Failed to connect to localhost"
-            
-            # Check if health endpoint is working (we can see it in logs)
-            echo "Checking if health endpoint responded in logs:"
-            if docker logs test-app | grep -q "GET /health HTTP/1.1\" 200"; then
-              echo "✅ Health endpoint is working (confirmed in logs)"
-            else
-              echo "❌ Health endpoint not working"
-              exit 1
-            fi
-            
-            # Try one more time with a longer wait
-            echo "Running final health checks:"
-            sleep 5
-            curl --fail --retry 5 --retry-connrefused --retry-delay 2 http://localhost:5000/health || echo "External curl failed, but container is working"
-            curl --fail --retry 5 --retry-connrefused --retry-delay 2 http://localhost:5000/api/health || echo "External curl failed, but container is working"
+            echo "✅ All health checks passed - container is working correctly"
       - run:
           name: Cleanup
           command: |
