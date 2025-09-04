@@ -165,6 +165,9 @@ commands:
           at: .
       - configure-oidc-auth
       - run:
+          name: Start release plan
+          command: circleci run release plan terraform-deploy --environment-name=production --component-name=infrastructure --target-version=${CIRCLE_SHA1}
+      - run:
           name: Terraform apply
           command: |
             # Configure AWS CLI with OIDC token
@@ -176,13 +179,13 @@ commands:
             # Apply the plan that was generated in the terraform-plan job
             terraform apply tfplan
       - run:
-          name: Update deploy to SUCCESS
-          command: circleci run release update --status=SUCCESS
-          when: on_success
-      - run:
-          name: Update deploy to FAILED
-          command: circleci run release update --status=FAILED
-          when: on_fail
+          name: Update deploy status
+          command: |
+            if [ $? -eq 0 ]; then
+              circleci run release update terraform-deploy --status=success --environment-name=production --component-name=infrastructure
+            else
+              circleci run release update terraform-deploy --status=fail --environment-name=production --component-name=infrastructure
+            fi
 
   push-to-ecr-with-auth:
     description: "Push Docker image to ECR with OIDC authentication"
