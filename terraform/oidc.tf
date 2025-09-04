@@ -82,9 +82,17 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "ecs:DescribeServices",
           "ecs:DescribeTaskDefinition",
           "ecs:RegisterTaskDefinition",
+          "ecs:DeregisterTaskDefinition",
           "ecs:UpdateService",
           "ecs:DescribeTasks",
-          "ecs:ListTasks"
+          "ecs:ListTasks",
+          "ecs:CreateCluster",
+          "ecs:DeleteCluster",
+          "ecs:CreateService",
+          "ecs:DeleteService",
+          "ecs:TagResource",
+          "ecs:UntagResource",
+          "ecs:ListTagsForResource"
         ]
         Resource = "*"
       },
@@ -117,7 +125,16 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
           "ec2:DescribeAvailabilityZones",
-          "ec2:DescribeInstances"
+          "ec2:DescribeInstances",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "ec2:DescribeTags"
         ]
         Resource = "*"
       },
