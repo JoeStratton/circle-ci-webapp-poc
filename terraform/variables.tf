@@ -72,7 +72,7 @@ variable "cloudwatch_log_retention_days" {
 variable "circleci_organization_id" {
   description = "CircleCI Organization ID (UUID) for OIDC trust policy"
   type        = string
-  
+
   validation {
     condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.circleci_organization_id))
     error_message = "CircleCI Organization ID must be a valid UUID format."

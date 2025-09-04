@@ -8,10 +8,10 @@ terraform {
     }
   }
 
-   backend "s3" {
-     bucket         = "joes-circleci-demo-poc-state"  # Must match var.state_bucket
-     key            = "circleci-demo.tfstate"
-     region         = "us-east-1"
-     encrypt        = true
-   }
+  backend "s3" {
+    bucket  = "joes-circleci-demo-poc-state"
+    key     = "circleci-demo.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+  }
 }
