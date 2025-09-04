@@ -166,7 +166,7 @@ commands:
       - configure-oidc-auth
       - run:
           name: Start release plan
-          command: circleci run release plan terraform-deploy --target-version=${CIRCLE_SHA1}
+          command: circleci run release plan terraform-deploy --environment-name=production --component-name=infrastructure --target-version=${CIRCLE_SHA1}
       - run:
           name: Terraform apply
           command: |
