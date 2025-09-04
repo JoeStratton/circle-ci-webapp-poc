@@ -258,10 +258,6 @@ workflows:
       - unit-tests
       - integration-tests
       - tf-fmt-oidc
-      - tf-validate-oidc:
-          context: aws-production
-          requires:
-            - tf-fmt-oidc
   
       # Phase 2: Build and Test Docker Image (runs on all branches)
       - build-and-test-image
@@ -273,6 +269,14 @@ workflows:
             - unit-tests
             - integration-tests
             - build-and-test-image
+
+      - tf-validate-oidc:
+          context: aws-production
+          requires:
+            - tf-fmt-oidc
+          filters:
+            branches:
+              only: main
       
       # Phase 5: Production Deployment (MAIN BRANCH ONLY)
       - aws-ecr/build_and_push_image:
