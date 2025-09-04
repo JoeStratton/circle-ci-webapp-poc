@@ -32,7 +32,8 @@ Test Fixtures:
 
 import json
 import pytest
-from app import app, db, User, HealthCheck
+from app import app, db
+from models import User, HealthCheck
 
 # pytest markers for better test organization and JUnit XML categorization
 
@@ -146,7 +147,7 @@ class TestUserEndpoints:
     def test_create_duplicate_user(self, client, sample_user):
         """Test creating a user with duplicate username or email"""
         duplicate_data = {
-            'username': sample_user.username,
+            'username': sample_user['username'],
             'email': 'different@example.com'
         }
         
@@ -177,7 +178,7 @@ class TestUserEndpoints:
     
     def test_delete_user(self, client, sample_user):
         """Test deleting a user"""
-        user_id = sample_user.id
+        user_id = sample_user['id']
         
         response = client.delete(f'/api/users/{user_id}')
         assert response.status_code == 200
@@ -247,7 +248,7 @@ class TestMainRoutes:
         """Test the main index route"""
         response = client.get('/')
         assert response.status_code == 200
-        assert b'CircleCI Field Engineer Demo Application' in response.data
+        assert b'CircleCI Demo POC' in response.data
         assert b'Application Status' in response.data
     
     def test_404_error_handler(self, client):

@@ -15,6 +15,7 @@ import os
 import logging
 from datetime import datetime
 from flask import Blueprint, render_template, jsonify, request, current_app
+from werkzeug.exceptions import NotFound
 from sqlalchemy import text
 from models import User, HealthCheck
 
@@ -231,6 +232,9 @@ def delete_user(user_id):
         
         logger.info(f"Deleted user: {user.username}")
         return jsonify({'message': 'User deleted successfully'})
+        
+    except NotFound:
+        return jsonify({'error': 'User not found'}), 404
         
     except Exception as e:
         current_app.db.session.rollback()
