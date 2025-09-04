@@ -107,7 +107,8 @@ commands:
           name: Terraform validate
           command: |
             cd terraform
-            terraform init
+            # Use local backend for validation to avoid AWS credential issues
+            terraform init -backend=false
             terraform validate
 
   terraform-plan-with-auth:
