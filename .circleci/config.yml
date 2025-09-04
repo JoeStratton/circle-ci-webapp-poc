@@ -348,24 +348,9 @@ workflows:
             branches:
               only: main
       
-      - aws-ecs/deploy_service_update:
-          context: aws-production
-          requires:
-            - tf-apply-oidc
-          filters:
-            branches:
-              only: main
-          auth:
-            - aws-cli/setup:
-                role_arn: ${AWS_ROLE_ARN}
-          cluster: circle-ci-webapp-poc-cluster
-          container_image_name_updates: container=circle-ci-webapp-poc-app,tag=${CIRCLE_SHA1}
-          family: circle-ci-webapp-poc-task
-          region: ${AWS_REGION}
-
       - release-update:
           requires:
-            - aws-ecs/deploy_service_update
+            - tf-apply-oidc
           filters:
             branches:
               only: main
