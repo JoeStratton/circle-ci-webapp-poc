@@ -278,6 +278,9 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "elasticfilesystem:DescribeMountTargetSecurityGroups",
           "elasticfilesystem:CreateTags",
           "elasticfilesystem:DeleteTags",
+          "elasticfilesystem:DescribeLifecycleConfiguration",
+          "elasticfilesystem:PutLifecycleConfiguration",
+          "elasticfilesystem:DeleteLifecycleConfiguration"
         ]
         Resource = "*"
       },
