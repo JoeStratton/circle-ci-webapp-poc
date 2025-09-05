@@ -12,8 +12,8 @@ resource "aws_efs_file_system" "postgres_data" {
 resource "aws_efs_access_point" "postgres_data" {
   file_system_id = aws_efs_file_system.postgres_data.id
   posix_user {
-    gid = 999  # postgres user group ID
-    uid = 999  # postgres user ID
+    gid = 999 # postgres user group ID
+    uid = 999 # postgres user ID
   }
   root_directory {
     path = "/postgres-data"
