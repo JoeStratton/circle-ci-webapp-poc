@@ -233,11 +233,16 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "iam:UntagPolicy",
           "iam:PutRolePolicy",
           "iam:DeleteRolePolicy",
+          "iam:GetRolePolicy",
+          "iam:ListEntitiesForPolicy",
           "iam:ListPolicyVersions",
           "iam:GetPolicyVersion",
           "iam:CreatePolicyVersion",
           "iam:DeletePolicyVersion",
-          "iam:GetRolePolicy"
+          "iam:SetDefaultPolicyVersion",
+          "iam:GetRole",
+          "iam:UpdateRole",
+          "iam:PassRole"
         ]
         Resource = "*"
       },
@@ -256,7 +261,9 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "elasticfilesystem:DescribeAccessPoints",
           "elasticfilesystem:TagResource",
           "elasticfilesystem:UntagResource",
-          "elasticfilesystem:ListTagsForResource"
+          "elasticfilesystem:ListTagsForResource",
+          "elasticfilesystem:ModifyMountTargetSecurityGroups",
+          "elasticfilesystem:DescribeMountTargetSecurityGroups"
         ]
         Resource = "*"
       },
