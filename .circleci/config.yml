@@ -220,6 +220,12 @@ jobs:
           role_arn: $AWS_ROLE_ARN
       - terraform/init:
           path: terraform
+      - run:
+          name: Debug environment variables
+          command: |
+            echo "DATABASE_PASSWORD: $DATABASE_PASSWORD"
+            echo "CIRCLECI_ORGANIZATION_ID: $CIRCLECI_ORGANIZATION_ID"
+            echo "CIRCLECI_PROJECT_ID: $CIRCLECI_PROJECT_ID"
       - terraform/plan:
           path: terraform
           out: tfplan
