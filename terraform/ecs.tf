@@ -179,6 +179,10 @@ resource "aws_ecs_task_definition" "app" {
       root_directory          = "/"
       transit_encryption      = "ENABLED"
       transit_encryption_port = 2049
+      authorization_config {
+        access_point_id = aws_efs_access_point.postgres_data.id
+        iam             = "ENABLED"
+      }
     }
   }
 

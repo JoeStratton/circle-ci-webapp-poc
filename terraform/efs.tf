@@ -2,6 +2,9 @@
 resource "aws_efs_file_system" "postgres_data" {
   creation_token = "${var.project_name}-postgres-data"
   encrypted      = true
+  performance_mode = "generalPurpose"
+  throughput_mode  = "provisioned"
+  provisioned_throughput_in_mibps = 100
 
   tags = merge(var.common_tags, {
     Name = "${var.project_name}-postgres-data"
@@ -56,9 +59,9 @@ resource "aws_security_group" "efs_mount" {
   })
 }
 
-# EFS Mount Targets (2 subnets for POC - first 2 AZs)
+# EFS Mount Targets (all subnets to ensure ECS tasks can access EFS)
 resource "aws_efs_mount_target" "postgres_data" {
-  count           = 2
+  count           = length(data.aws_subnets.default.ids)
   file_system_id  = aws_efs_file_system.postgres_data.id
   subnet_id       = data.aws_subnets.default.ids[count.index]
   security_groups = [aws_security_group.efs_mount.id]
