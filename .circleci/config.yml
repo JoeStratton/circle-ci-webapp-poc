@@ -220,19 +220,13 @@ jobs:
           role_arn: $AWS_ROLE_ARN
       - terraform/init:
           path: terraform
-      - run:
-          name: Debug environment variables
-          command: |
-            echo "DATABASE_PASSWORD: $DATABASE_PASSWORD"
-            echo "CIRCLECI_ORGANIZATION_ID: $CIRCLECI_ORGANIZATION_ID"
-            echo "CIRCLECI_PROJECT_ID: $CIRCLECI_PROJECT_ID"
       - terraform/plan:
           path: terraform
           out: tfplan
           var: |
             circleci_organization_id=$CIRCLECI_ORGANIZATION_ID,
             circleci_project_id=$CIRCLECI_PROJECT_ID,
-            database_password=$DATABASE_PASSWORD
+            database_password=$DB_PASSWORD
       - persist_to_workspace:
           root: .
           paths:
@@ -255,7 +249,7 @@ jobs:
           var: |
             circleci_organization_id=$CIRCLECI_ORGANIZATION_ID,
             circleci_project_id=$CIRCLECI_PROJECT_ID,
-            database_password=$DATABASE_PASSWORD
+            database_password=$DB_PASSWORD
 
   # CircleCI releases
   release-plan:
