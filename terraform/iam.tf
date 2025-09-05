@@ -210,39 +210,35 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
       {
         Effect = "Allow"
         Action = [
-          # IAM permissions for role and policy management
+          # Comprehensive IAM permissions for role and policy management
           "iam:GetRole",
-          "iam:GetRolePolicy",
           "iam:CreateRole",
           "iam:UpdateRole",
           "iam:DeleteRole",
-          "iam:GetPolicy",
-          "iam:GetPolicyVersion",
-          "iam:CreatePolicy",
-          "iam:DeletePolicy",
-          "iam:GetOpenIDConnectProvider",
-          "iam:CreateOpenIDConnectProvider",
-          "iam:DeleteOpenIDConnectProvider",
+          "iam:GetRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
           "iam:AttachRolePolicy",
           "iam:DetachRolePolicy",
           "iam:ListAttachedRolePolicies",
           "iam:ListRolePolicies",
           "iam:TagRole",
           "iam:UntagRole",
+          "iam:PassRole",
+          "iam:GetPolicy",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
           "iam:TagPolicy",
           "iam:UntagPolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:GetRolePolicy",
-          "iam:ListEntitiesForPolicy",
           "iam:ListPolicyVersions",
           "iam:GetPolicyVersion",
           "iam:CreatePolicyVersion",
           "iam:DeletePolicyVersion",
           "iam:SetDefaultPolicyVersion",
-          "iam:GetRole",
-          "iam:UpdateRole",
-          "iam:PassRole"
+          "iam:ListEntitiesForPolicy",
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider"
         ]
         Resource = "*"
       },
@@ -263,7 +259,9 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "elasticfilesystem:UntagResource",
           "elasticfilesystem:ListTagsForResource",
           "elasticfilesystem:ModifyMountTargetSecurityGroups",
-          "elasticfilesystem:DescribeMountTargetSecurityGroups"
+          "elasticfilesystem:DescribeMountTargetSecurityGroups",
+          "elasticfilesystem:CreateTags",
+          "elasticfilesystem:DeleteTags"
         ]
         Resource = "*"
       },
