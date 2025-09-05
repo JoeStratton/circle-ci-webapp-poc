@@ -61,7 +61,7 @@ resource "aws_security_group" "efs_mount" {
 
 # EFS Mount Targets (all subnets to ensure ECS tasks can access EFS)
 resource "aws_efs_mount_target" "postgres_data" {
-  count           = length(data.aws_subnets.default.ids)
+  count           = 2
   file_system_id  = aws_efs_file_system.postgres_data.id
   subnet_id       = data.aws_subnets.default.ids[count.index]
   security_groups = [aws_security_group.efs_mount.id]
