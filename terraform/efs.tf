@@ -56,9 +56,9 @@ resource "aws_security_group" "efs_mount" {
   })
 }
 
-# EFS Mount Targets (one per subnet)
+# EFS Mount Targets (2 subnets for POC - first 2 AZs)
 resource "aws_efs_mount_target" "postgres_data" {
-  count           = length(data.aws_subnets.default.ids)
+  count           = 2
   file_system_id  = aws_efs_file_system.postgres_data.id
   subnet_id       = data.aws_subnets.default.ids[count.index]
   security_groups = [aws_security_group.efs_mount.id]
