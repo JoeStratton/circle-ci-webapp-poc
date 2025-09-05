@@ -238,7 +238,25 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "iam:ListEntitiesForPolicy",
           "iam:GetOpenIDConnectProvider",
           "iam:CreateOpenIDConnectProvider",
-          "iam:DeleteOpenIDConnectProvider"
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:ListRoles",
+          "iam:ListPolicies",
+          "iam:GetAccountSummary",
+          "iam:GetUser",
+          "iam:ListUsers",
+          "iam:ListGroups",
+          "iam:ListGroupsForUser",
+          "iam:ListAttachedUserPolicies",
+          "iam:ListAttachedGroupPolicies",
+          "iam:SimulatePrincipalPolicy",
+          "iam:SimulateCustomPolicy",
+          "iam:CreateServiceLinkedRole",
+          "iam:DeleteServiceLinkedRole",
+          "iam:GetServiceLinkedRoleDeletionStatus",
+          "iam:UpdateRoleDescription",
+          "iam:PutRolePermissionsBoundary",
+          "iam:DeleteRolePermissionsBoundary",
+          "iam:GetRolePermissionsBoundary"
         ]
         Resource = "*"
       },
