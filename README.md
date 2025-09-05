@@ -44,7 +44,7 @@ GitHub → CircleCI → AWS ECS (Flask + PostgreSQL Sidecars)
 ### 5-Minute Setup
 ```bash
 # 1. Clone and test locally
-git clone https://github.com/YOUR_USERNAME/circle-ci-webapp-poc.git
+git clone https://github.com/JoeStratton/circle-ci-webapp-poc.git
 cd circle-ci-webapp-poc
 ./scripts/test-unit.sh  # Fast unit tests
 

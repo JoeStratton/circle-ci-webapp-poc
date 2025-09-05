@@ -47,6 +47,15 @@ resource "aws_iam_role_policy" "ecs_task_execution_custom" {
           aws_cloudwatch_log_group.ecs_logs.arn,
           "${aws_cloudwatch_log_group.ecs_logs.arn}:*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess"
+        ]
+        Resource = "*"
       }
     ]
   })
