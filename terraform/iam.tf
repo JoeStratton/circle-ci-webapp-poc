@@ -242,21 +242,19 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "iam:ListRoles",
           "iam:ListPolicies",
           "iam:GetAccountSummary",
-          "iam:GetUser",
-          "iam:ListUsers",
-          "iam:ListGroups",
-          "iam:ListGroupsForUser",
-          "iam:ListAttachedUserPolicies",
-          "iam:ListAttachedGroupPolicies",
-          "iam:SimulatePrincipalPolicy",
-          "iam:SimulateCustomPolicy",
-          "iam:CreateServiceLinkedRole",
-          "iam:DeleteServiceLinkedRole",
-          "iam:GetServiceLinkedRoleDeletionStatus",
-          "iam:UpdateRoleDescription",
-          "iam:PutRolePermissionsBoundary",
-          "iam:DeleteRolePermissionsBoundary",
-          "iam:GetRolePermissionsBoundary"
+          "iam:GetRolePolicyDocument",
+          "iam:GetPolicyDocument",
+          "iam:ListInstanceProfiles",
+          "iam:ListInstanceProfilesForRole",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:GetInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:UntagInstanceProfile",
+          "iam:ListInstanceProfileTags",
+          "iam:ListPolicyTags"
         ]
         Resource = "*"
       },
@@ -279,7 +277,7 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "elasticfilesystem:ModifyMountTargetSecurityGroups",
           "elasticfilesystem:DescribeMountTargetSecurityGroups",
           "elasticfilesystem:CreateTags",
-          "elasticfilesystem:DeleteTags"
+          "elasticfilesystem:DeleteTags",
         ]
         Resource = "*"
       },
@@ -292,7 +290,21 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "logs:CreateLogGroup",
           "logs:DeleteLogGroup",
           "logs:TagLogGroup",
-          "logs:UntagLogGroup"
+          "logs:UntagLogGroup",
+          "logs:CreateLogStream",
+          "logs:DeleteLogStream",
+          "logs:DescribeLogStreams",
+          "logs:PutLogEvents",
+          "logs:GetLogEvents",
+          "logs:FilterLogEvents",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy",
+          "logs:PutResourcePolicy",
+          "logs:DeleteResourcePolicy",
+          "logs:DescribeResourcePolicies",
+          "logs:DescribeMetricFilters",
+          "logs:PutMetricFilter",
+          "logs:DeleteMetricFilter"
         ]
         Resource = "*"
       },
@@ -317,40 +329,12 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
   })
 }
 
-# IAM Policy for CircleCI - CloudWatch Logs permissions
-resource "aws_iam_policy" "circleci_logs_policy" {
-  name        = "${var.project_name}-circleci-logs-policy"
-  description = "Policy for CircleCI to access CloudWatch logs"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams"
-        ]
-        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${var.project_name}-*"
-      }
-    ]
-  })
-
-  tags = merge(var.common_tags, {
-    Name = "${var.project_name}-circleci-logs-policy"
-  })
-}
+# =============================================================================
+# Policy Attachments
+# =============================================================================
 
 # Attach policies to the CircleCI role
 resource "aws_iam_role_policy_attachment" "circleci_ecs_ecr_attachment" {
   role       = aws_iam_role.circleci_oidc_role.name
   policy_arn = aws_iam_policy.circleci_ecs_ecr_policy.arn
-}
-
-resource "aws_iam_role_policy_attachment" "circleci_logs_attachment" {
-  role       = aws_iam_role.circleci_oidc_role.name
-  policy_arn = aws_iam_policy.circleci_logs_policy.arn
 }
