@@ -325,7 +325,6 @@ workflows:
       - hold-apply:
           type: approval
           requires:
-            - aws-ecr/build_and_push_image
             - tf-plan-oidc
           filters:
             branches:
@@ -342,6 +341,7 @@ workflows:
           context: aws-production
           requires:
             - hold-apply
+            - release-plan
           filters:
             branches:
               only: main

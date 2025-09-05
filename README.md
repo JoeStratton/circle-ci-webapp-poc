@@ -76,6 +76,103 @@ terraform apply
 git push origin main
 ```
 
+## 🧪 Local Testing
+
+### Prerequisites for Local Testing
+```bash
+# Install Python dependencies
+cd app
+pip install -r requirements.txt
+
+# Install additional testing tools (optional)
+pip install bandit  # For security scanning
+pip install flake8  # For code quality and linting
+```
+
+### Running Tests Locally
+
+#### 1. Unit Tests (Fast & Isolated)
+```bash
+# Quick unit tests with SQLite in-memory database
+./scripts/test-unit.sh
+
+# Testing Framework: pytest + SQLite in-memory
+# What it tests:
+# ✅ Flask routes and API endpoints
+# ✅ Database models and validation
+# ✅ Error handling scenarios
+# ✅ Fast execution (~30 seconds)
+# 📊 Generates coverage report: coverage/unit-html/index.html
+```
+
+#### 2. Integration Tests (PostgreSQL Sidecar)
+```bash
+# Start PostgreSQL sidecar container
+docker run -d --name test-postgres \
+  -e POSTGRES_USER=testuser \
+  -e POSTGRES_PASSWORD=testpass \
+  -e POSTGRES_DB=testdb \
+  -p 5432:5432 \
+  postgres:13
+
+# Run integration tests
+./scripts/test-integration.sh
+
+# Cleanup
+docker stop test-postgres && docker rm test-postgres
+
+# Testing Framework: pytest + PostgreSQL sidecar + bandit security scanning
+# What it tests:
+# ✅ PostgreSQL database connectivity
+# ✅ Database transactions and migrations
+# ✅ API integration workflows
+# ✅ Security scanning with bandit
+# 📊 Generates coverage report: coverage/integration-html/index.html
+```
+
+#### 3. Container Tests (Docker Validation)
+```bash
+# Test containerized application behavior
+./scripts/test-container.sh
+
+# Testing Framework: dgoss + pytest + Docker
+# What it tests:
+# ✅ Docker image builds successfully
+# ✅ Container starts and responds to health checks
+# ✅ Port 5000 is accessible
+# ✅ Gunicorn process runs correctly
+# ✅ Non-root user security (appuser:999)
+# ✅ HTTP endpoints return expected responses
+# 📋 Generates JUnit XML: test-results/container-validation.xml
+```
+
+#### 4. Code Quality & Linting
+```bash
+# Run code quality checks
+flake8 app/app.py --max-line-length=120 --statistics
+
+# Check Python syntax
+python -m py_compile app/app.py
+
+# Verify dependencies
+pip check
+
+# Testing Framework: flake8 + py_compile + pip check
+# What it checks:
+# ✅ Code style and formatting (PEP 8 compliance)
+# ✅ Python syntax validation
+# ✅ Dependency compatibility
+# ✅ Line length limits (120 characters)
+# 📊 Generates statistics on code quality issues
+```
+
+#### Test Output Locations
+- **Unit Tests**: `coverage/unit-html/index.html`
+- **Integration Tests**: `coverage/integration-html/index.html`
+- **Container Tests**: `coverage/container-html/index.html`
+- **JUnit XML**: `test-results/*.xml`
+- **Security Report**: `test-results/security-report.json`
+
 ## 🧪 Testing Strategy
 
 ### Three-Stage Pipeline Testing
