@@ -1,8 +1,8 @@
 graph TB    
     subgraph "CircleCI Pipeline POC"
         F[Lint & Format<br/>Code Quality] --> G[Unit Tests<br/>pytest + SQLite + JUnit XML]
-        G --> H[Integration Tests<br/>pytest + PostgreSQL Sidecar + Security Scan]
-        H --> I[Build & Test Image<br/>Multi-stage Docker + dgoss]
+        G --> H[Integration Tests + Security Scan<br/>pytest + PostgreSQL Sidecar + bandit]
+        H --> I[Build & Test Image<br/>Multi-stage Docker + health checks]
         I --> J[Container Tests<br/>dgoss + pytest validation]
         J --> K{Branch Check}
         K -->|main| N[Push to ECR<br/>OIDC Authentication]
@@ -15,10 +15,8 @@ graph TB
     subgraph "AWS Infrastructure"
         S[ECR Repository<br/>3 Image Retention]
         T[ECS Fargate Spot<br/>Flask + PostgreSQL Sidecar]
-        U[CircleCI Contexts<br/>Encrypted Credentials]
-        V[S3 Artifacts<br/>7-day Lifecycle]
+        U[CircleCI Contexts<br/>Encrypted Environment Vars]
         W[CloudWatch Logs<br/>1-day Retention]
-        X[EFS Storage<br/>Persistent PostgreSQL Data]
     end
     
     subgraph "Application Containers"
@@ -39,10 +37,7 @@ graph TB
     T --> AA
     T --> BB
     BB --> CC
-    AA --> X
-    U --> AA
     U --> BB
-    R --> V
     T --> W
     DD --> R
     EE --> R
