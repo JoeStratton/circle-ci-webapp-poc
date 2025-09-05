@@ -1,9 +1,9 @@
 # EFS File System for PostgreSQL persistent storage
 resource "aws_efs_file_system" "postgres_data" {
-  creation_token = "${var.project_name}-postgres-data"
-  encrypted      = true
-  performance_mode = "generalPurpose"
-  throughput_mode  = "provisioned"
+  creation_token                  = "${var.project_name}-postgres-data"
+  encrypted                       = true
+  performance_mode                = "generalPurpose"
+  throughput_mode                 = "provisioned"
   provisioned_throughput_in_mibps = 100
 
   tags = merge(var.common_tags, {
