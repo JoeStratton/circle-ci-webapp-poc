@@ -106,7 +106,7 @@ variable "database_password" {
   type        = string
   sensitive   = true
   # No default - must be provided via CircleCI context
-  
+
   validation {
     condition     = length(var.database_password) > 0
     error_message = "Database password must not be empty."
