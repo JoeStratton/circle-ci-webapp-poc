@@ -9,9 +9,9 @@ terraform {
   }
 
   backend "s3" {
-    bucket  = "joes-circleci-demo-poc-state"
+    bucket  = var.state_bucket
     key     = "circleci-demo.tfstate"
-    region  = "us-east-1"
+    region  = var.aws_region
     encrypt = true
   }
 }

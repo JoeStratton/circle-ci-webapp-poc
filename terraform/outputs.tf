@@ -1,6 +1,3 @@
-# Terraform Outputs for Application Infrastructure
-# Export important resource information for use by CircleCI and other tools
-
 output "ecr_repository_url" {
   description = "ECR repository URL for Docker images"
   value       = aws_ecr_repository.app_repo.repository_url

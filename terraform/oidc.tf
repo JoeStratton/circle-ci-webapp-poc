@@ -1,6 +1,3 @@
-# CircleCI OIDC Provider and IAM Role
-# Environment-level security setup for CI/CD authentication
-
 # OIDC Identity Provider for CircleCI
 resource "aws_iam_openid_connect_provider" "circleci" {
   url = "https://oidc.circleci.com/org/${var.circleci_organization_id}"

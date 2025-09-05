@@ -18,33 +18,35 @@ graph TB
         U[CircleCI Contexts<br/>Encrypted Credentials]
         V[S3 Artifacts<br/>7-day Lifecycle]
         W[CloudWatch Logs<br/>1-day Retention]
+        X[EFS Storage<br/>Persistent PostgreSQL Data]
     end
     
     subgraph "Application Containers"
-        X[PostgreSQL Sidecar<br/>postgres:13 off-the-shelf]
-        Y[Flask App Container<br/>Connects to localhost:5432]
-        Z[Web Interface<br/>HTML5 + CSS3 + JavaScript]
+        AA[PostgreSQL Sidecar<br/>postgres:13 off-the-shelf]
+        BB[Flask App Container<br/>Connects to localhost:5432]
+        CC[Web Interface<br/>HTML5 + CSS3 + JavaScript]
     end
     
     subgraph "Security & Access"
-        AA[OIDC Provider<br/>No Static Keys]
-        BB[IAM Role<br/>Least Privilege]
-        CC[Branch Restrictions<br/>Main Only Deploy]
+        DD[OIDC Provider<br/>No Static Keys]
+        EE[IAM Role<br/>Least Privilege]
+        FF[Branch Restrictions<br/>Main Only Deploy]
     end
     
     %% Connections
     N --> S
     R --> T
-    T --> X
-    T --> Y
-    Y --> Z
-    U --> X
-    U --> Y
+    T --> AA
+    T --> BB
+    BB --> CC
+    AA --> X
+    U --> AA
+    U --> BB
     R --> V
     T --> W
-    AA --> R
-    BB --> R
-    CC --> N
+    DD --> R
+    EE --> R
+    FF --> N
     
     %% Styling
     classDef pipeline fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
@@ -56,9 +58,9 @@ graph TB
     classDef web fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     
     class F,G,H,I,J pipeline
-    class S,T,U,V,W aws
-    class X,Y application
-    class Z web
-    class AA,BB,CC security
+    class S,T,U,V,W,X aws
+    class AA,BB application
+    class CC web
+    class DD,EE,FF security
     class K decision
     class N,P,Q,R deploy

@@ -1,4 +1,3 @@
-# ECS Cluster with cost optimization
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
 
@@ -144,6 +143,14 @@ resource "aws_ecs_task_definition" "app" {
         }
       ]
 
+      mountPoints = [
+        {
+          sourceVolume  = "postgres-data"
+          containerPath = "/var/lib/postgresql/data"
+          readOnly      = false
+        }
+      ]
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -165,12 +172,21 @@ resource "aws_ecs_task_definition" "app" {
     }
   ])
 
+  volume {
+    name = "postgres-data"
+    efs_volume_configuration {
+      file_system_id          = aws_efs_file_system.postgres_data.id
+      root_directory          = "/"
+      transit_encryption      = "ENABLED"
+      transit_encryption_port = 2049
+    }
+  }
+
   tags = merge(var.common_tags, {
     Name = "${var.project_name}-task-def"
   })
 }
 
-# ECS Service (cost-optimized)
 resource "aws_ecs_service" "app" {
   name            = "${var.project_name}-service"
   cluster         = aws_ecs_cluster.main.id

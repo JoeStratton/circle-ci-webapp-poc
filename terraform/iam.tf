@@ -47,6 +47,15 @@ resource "aws_iam_role_policy" "ecs_task_execution_custom" {
           aws_cloudwatch_log_group.ecs_logs.arn,
           "${aws_cloudwatch_log_group.ecs_logs.arn}:*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite",
+          "elasticfilesystem:ClientRootAccess"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -73,6 +82,3 @@ resource "aws_iam_role" "ecs_task_role" {
     Name = "${var.project_name}-ecs-task-role"
   })
 }
-
-# Custom policy for ECS task (application-level permissions)
-# Note: S3 artifact bucket policy removed as artifacts are no longer used
