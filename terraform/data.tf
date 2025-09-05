@@ -32,8 +32,3 @@ data "aws_security_group" "default" {
   name   = "default"
   vpc_id = data.aws_vpc.default.id
 }
-
-# CircleCI OIDC thumbprint - static known value from https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc_verify-thumbprint.html
-locals {
-  circleci_thumbprint = "06b25927c42a721631c1efd9431e648fa62e1e39"
-}
