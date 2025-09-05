@@ -158,7 +158,28 @@ resource "aws_iam_policy" "circleci_ecs_ecr_policy" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:TagPolicy",
-          "iam:UntagPolicy"
+          "iam:UntagPolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          # EFS permissions for persistent storage
+          "elasticfilesystem:CreateFileSystem",
+          "elasticfilesystem:DeleteFileSystem",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:CreateMountTarget",
+          "elasticfilesystem:DeleteMountTarget",
+          "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:CreateAccessPoint",
+          "elasticfilesystem:DeleteAccessPoint",
+          "elasticfilesystem:DescribeAccessPoints",
+          "elasticfilesystem:TagResource",
+          "elasticfilesystem:UntagResource",
+          "elasticfilesystem:ListTagsForResource"
         ]
         Resource = "*"
       },
