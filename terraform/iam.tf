@@ -82,6 +82,3 @@ resource "aws_iam_role" "ecs_task_role" {
     Name = "${var.project_name}-ecs-task-role"
   })
 }
-
-# Custom policy for ECS task (application-level permissions)
-# Note: S3 artifact bucket policy removed as artifacts are no longer used

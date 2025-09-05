@@ -1,4 +1,3 @@
-# ECS Cluster with cost optimization
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
 
@@ -188,7 +187,6 @@ resource "aws_ecs_task_definition" "app" {
   })
 }
 
-# ECS Service (cost-optimized)
 resource "aws_ecs_service" "app" {
   name            = "${var.project_name}-service"
   cluster         = aws_ecs_cluster.main.id
